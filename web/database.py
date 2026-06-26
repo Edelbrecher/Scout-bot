@@ -12612,6 +12612,19 @@ async def _init_artifact_tables():
                 await db.commit()
             except Exception:
                 pass
+        # Auto-rotation columns
+        for col in [
+            "rotation_active INTEGER DEFAULT 0",
+            "rotation_started_at TEXT DEFAULT ''",
+            "rotation_channel_id TEXT DEFAULT ''",
+            "rot_last_start_window INTEGER DEFAULT -1",
+            "rot_last_notify_window INTEGER DEFAULT -1",
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE artifacts ADD COLUMN {col}")
+                await db.commit()
+            except Exception:
+                pass
         # Migration: is_test column for ally_treasuries
         try:
             await db.execute("ALTER TABLE ally_treasuries ADD COLUMN is_test INTEGER DEFAULT 0")
@@ -13207,6 +13220,97 @@ async def save_rotation(artifact_id: int, guild_id: str, players: list[dict]) ->
                   int(p.get("hold_hours", 48)), int(p.get("notify_hours", 6))))
         await db.commit()
     return True
+
+
+# ── Auto-rotation schedule computation ─────────────────────────────────────
+
+def compute_rotation_state(players: list[dict], started_at_iso: str, now=None) -> dict | None:
+    """Given an ordered rotation + a cyclic start time, compute the live state.
+
+    Returns dict with: current_index, current_player, current_hold_hours,
+    notify_hours, window_number (monotonic), window_start (iso), window_end (iso),
+    seconds_until_handoff, next_index, next_player, cycle_hours — or None if
+    the rotation can't run (no players, zero total hold time, bad start).
+    """
+    import datetime as _dt
+    if not players:
+        return None
+    holds = [max(1, int(p.get("hold_hours", 48) or 48)) for p in players]
+    cycle_hours = sum(holds)
+    if cycle_hours <= 0:
+        return None
+    try:
+        started = _dt.datetime.fromisoformat(started_at_iso.replace("Z", ""))
+    except Exception:
+        return None
+    now = now or _dt.datetime.utcnow()
+    elapsed_h = (now - started).total_seconds() / 3600.0
+    n = len(players)
+    if elapsed_h < 0:
+        # Rotation hasn't started yet — first player is up at start.
+        full_cycles, offset = 0, 0.0
+    else:
+        full_cycles = int(elapsed_h // cycle_hours)
+        offset = elapsed_h - full_cycles * cycle_hours
+    acc = 0.0
+    cur_i, win_start_h, win_end_h = 0, 0.0, float(holds[0])
+    for i, h in enumerate(holds):
+        if offset < acc + h or i == n - 1:
+            cur_i = i
+            win_start_h = full_cycles * cycle_hours + acc
+            win_end_h = win_start_h + h
+            break
+        acc += h
+    window_number = full_cycles * n + cur_i
+    win_start = started + _dt.timedelta(hours=win_start_h)
+    win_end = started + _dt.timedelta(hours=win_end_h)
+    next_i = (cur_i + 1) % n
+    return {
+        "current_index": cur_i,
+        "current_player": players[cur_i].get("player_name", ""),
+        "current_hold_hours": holds[cur_i],
+        "notify_hours": int(players[cur_i].get("notify_hours", 6) or 6),
+        "window_number": window_number,
+        "window_start": win_start.isoformat(),
+        "window_end": win_end.isoformat(),
+        "seconds_until_handoff": (win_end - now).total_seconds(),
+        "next_index": next_i,
+        "next_player": players[next_i].get("player_name", ""),
+        "cycle_hours": cycle_hours,
+    }
+
+
+async def set_artifact_rotation_state(artifact_id: int, guild_id: str, **fields) -> bool:
+    """Update rotation control columns on an artifact (rotation_active,
+    rotation_started_at, rotation_channel_id, rot_last_start_window,
+    rot_last_notify_window, current_holder)."""
+    allowed = {"rotation_active", "rotation_started_at", "rotation_channel_id",
+               "rot_last_start_window", "rot_last_notify_window", "current_holder"}
+    sets, params = [], []
+    for k, v in fields.items():
+        if k in allowed:
+            sets.append(f"{k}=?")
+            params.append(v)
+    if not sets:
+        return False
+    params += [artifact_id, guild_id]
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute(
+            f"UPDATE artifacts SET {', '.join(sets)}, updated_at=datetime('now') WHERE id=? AND guild_id=?",
+            params,
+        )
+        await db.commit()
+    return True
+
+
+async def get_active_rotations() -> list[dict]:
+    """Return all artifacts with auto-rotation enabled (for the bot loop)."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM artifacts WHERE rotation_active=1 AND status='active'"
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
 
 
 # ── Handoff CRUD ──────────────────────────────────────────────────────────

@@ -117,20 +117,48 @@
   <!-- Unified Rotation & Handoffs -->
   <div class="section-card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
-      <div class="section-title" style="margin:0;">🔄 Rotation & Handoffs</div>
+      <div class="section-title" style="margin:0;">🔄 Auto-Rotation</div>
       <div style="display:flex;gap:.5rem;">
         {% if is_leader %}
         <button id="saveRotBtn" onclick="saveRotation()" class="btn btn-primary" style="font-size:.78rem;padding:.3rem .8rem;display:none;">💾 Save</button>
-        <button onclick="handOffToNext()" class="btn btn-secondary" style="font-size:.78rem;padding:.3rem .8rem;">📤 Hand Off to Next</button>
+        {% if artifact.rotation_active %}
+        <button onclick="stopRotation()" class="btn" style="font-size:.78rem;padding:.3rem .8rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;">⏹ Stop Rotation</button>
+        {% else %}
+        <button onclick="startRotation()" class="btn btn-primary" style="font-size:.78rem;padding:.3rem .8rem;background:linear-gradient(135deg,#16a34a,#22c55e);border-color:#16a34a;">▶ Start Rotation</button>
+        {% endif %}
         {% endif %}
       </div>
     </div>
 
+    {# ── Live auto-rotation banner ── #}
+    {% if artifact.rotation_active and rot_state %}
+    <div style="background:linear-gradient(135deg,rgba(34,197,94,.1),rgba(99,102,241,.08));border:1px solid rgba(34,197,94,.3);border-radius:12px;padding:.85rem 1rem;margin-bottom:1rem;">
+      <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
+        <span style="font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#4ade80;">● LIVE</span>
+        <span style="font-size:.95rem;font-weight:800;">🟢 {{ rot_state.current_player }}</span>
+        <span style="font-size:.78rem;color:var(--text-muted);">holds now</span>
+        <span style="margin-left:auto;font-size:.78rem;color:var(--text-muted);">cycle: {{ rot_state.cycle_hours }}h</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:.6rem;margin-top:.5rem;flex-wrap:wrap;">
+        <span style="font-size:.8rem;">⏳ Handoff to <strong style="color:#f59e0b;">{{ rot_state.next_player }}</strong> in</span>
+        <span id="rotCountdown" style="font-size:.9rem;font-weight:800;font-family:monospace;color:#fbbf24;" data-end="{{ rot_state.window_end }}">…</span>
+        <span style="font-size:.72rem;color:var(--text-muted);">(at {{ rot_state.window_end[:16].replace('T',' ') }} UTC)</span>
+      </div>
+      <div style="font-size:.72rem;color:var(--text-muted);margin-top:.4rem;">
+        🤖 The bot DMs each player when their turn starts and {{ rot_state.notify_hours }}h before they must pass it on. Holder advances automatically — no manual handoffs needed.
+      </div>
+    </div>
+    {% endif %}
+
     <div id="rotationList" style="min-height:60px;">
       {% if rotation %}
-      {% set current = artifact.current_holder %}
       {% set current_pos = namespace(val=-1) %}
-      {% for r in rotation %}{% if r.player_name == current %}{% set current_pos.val = loop.index0 %}{% endif %}{% endfor %}
+      {% if artifact.rotation_active and rot_state %}
+        {% set current_pos.val = rot_state.current_index %}
+      {% else %}
+        {% set current = artifact.current_holder %}
+        {% for r in rotation %}{% if r.player_name == current %}{% set current_pos.val = loop.index0 %}{% endif %}{% endfor %}
+      {% endif %}
       {% set next_pos = (current_pos.val + 1) % (rotation|length) if current_pos.val >= 0 and rotation|length > 0 else -1 %}
 
       {# Build a lookup of pending/confirmed handoffs by to_player #}
@@ -144,7 +172,7 @@
       {% endif %}
 
       {% for r in rotation %}
-      {% set is_current = r.player_name == artifact.current_holder %}
+      {% set is_current = loop.index0 == current_pos.val %}
       {% set is_next = loop.index0 == next_pos %}
       {% set player_handoff = handoff_map.data.get(r.player_name) %}
       {% set has_confirmed = player_handoff and player_handoff.status == 'confirmed' %}
@@ -663,6 +691,48 @@ async function deleteArtifact() {
   const res = await fetch(`/guild/${GUILD_ID}/artifacts/${ART_ID}/delete`, {method:'POST'});
   if (res.ok) location.href = `/guild/${GUILD_ID}/artifacts`;
 }
+
+// ── Auto-rotation start/stop ──────────────────────────────────────────────
+async function startRotation() {
+  if (!ROTATION_PLAYERS.length) {
+    showToast('Add players to the rotation first.', 'error');
+    return;
+  }
+  if (!confirm('Start the auto-rotation now?\n\nThe bot will create a private channel, add the rotation players, and DM each player when it is their turn. The holder advances automatically based on the hold times.')) return;
+  const res = await fetch(`/guild/${GUILD_ID}/artifacts/${ART_ID}/rotation/start`, {method:'POST'});
+  const d = await res.json().catch(() => ({}));
+  if (res.ok && d.ok) {
+    if (d.unresolved && d.unresolved.length) {
+      showToast('⚠️ No Discord match for: ' + d.unresolved.join(', ') + ' — they won\'t get DMs.', 'error');
+      setTimeout(() => location.reload(), 2500);
+    } else {
+      location.reload();
+    }
+  } else {
+    showToast('Error: ' + (d.message || d.error || res.status), 'error');
+  }
+}
+
+async function stopRotation() {
+  if (!confirm('Stop the auto-rotation? The rotation channel will be archived.')) return;
+  const res = await fetch(`/guild/${GUILD_ID}/artifacts/${ART_ID}/rotation/stop`, {method:'POST'});
+  if (res.ok) location.reload();
+}
+
+// ── Live countdown to next handoff ────────────────────────────────────────
+(function() {
+  const el = document.getElementById('rotCountdown');
+  if (!el) return;
+  const end = new Date(el.dataset.end).getTime();
+  function tick() {
+    const diff = end - Date.now();
+    if (diff <= 0) { el.textContent = 'now — advancing…'; el.style.color = '#f87171'; return; }
+    const h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000);
+    el.textContent = `${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`;
+    setTimeout(tick, 1000);
+  }
+  tick();
+})();
 {% endif %}
 
 // ── Confirm handoff ───────────────────────────────────────────────────────────

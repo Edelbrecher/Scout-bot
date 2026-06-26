@@ -61,6 +61,7 @@ class ScouterBot(commands.Bot):
         await self.load_extension("cogs.hero_scout")
         await self.load_extension("cogs.crop_tracker")
         await self.load_extension("cogs.digest")
+        await self.load_extension("cogs.artifact_rotation")
         await self.load_extension("cogs.wewin")
         await self.tree.sync()
         print("Slash commands synced.")
@@ -1753,6 +1754,93 @@ async def handle_delete_artifact_channels(request: aiohttp_web.Request) -> aioht
         return aiohttp_web.json_response({"ok": False, "error": str(e)})
 
 
+_ROTATION_CAT_NAME = "🏺 Artifact Rotations"
+
+async def handle_create_rotation_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    data = await request.json()
+    guild_id = data.get("guild_id")
+    artifact_name = data.get("artifact_name", "Artifact")
+    members = data.get("members", [])  # [{player_name, discord_id}]
+
+    guild = bot.get_guild(int(guild_id))
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "Guild not found"})
+
+    try:
+        # Find or create the rotations category
+        category = None
+        for cat in guild.categories:
+            if cat.name == _ROTATION_CAT_NAME:
+                category = cat
+                break
+        if not category:
+            category = await guild.create_category(_ROTATION_CAT_NAME)
+
+        # Build permission overwrites: private to rotation players + bot
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True),
+        }
+        added = []
+        for m in members:
+            try:
+                member = guild.get_member(int(m["discord_id"]))
+                if member:
+                    overwrites[member] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+                    added.append(member)
+            except Exception:
+                pass
+
+        import re as _re
+        safe = _re.sub(r"[^a-z0-9]+", "-", artifact_name.lower()).strip("-")[:60]
+        channel = await category.create_text_channel(
+            f"rota-{safe}",
+            overwrites=overwrites,
+            topic=f"Auto-rotation for {artifact_name}",
+        )
+
+        mentions = " ".join(mm.mention for mm in added) or "—"
+        embed = discord.Embed(
+            title=f"🏺 Rotation started — {artifact_name}",
+            description=(
+                "This channel coordinates the artifact rotation.\n\n"
+                "🤖 **The bot will DM each player** when it's their turn to hold the artifact, "
+                "and again before they must pass it on. The holder advances automatically — "
+                "you don't need to do anything except move the artifact when pinged."
+            ),
+            color=0x22c55e,
+        )
+        embed.add_field(name="Players", value=mentions, inline=False)
+        await channel.send(embed=embed)
+
+        return aiohttp_web.json_response({"ok": True, "channel_id": str(channel.id)})
+    except Exception as e:
+        print(f"[rotation] create channel error: {e}", flush=True)
+        return aiohttp_web.json_response({"ok": False, "error": str(e)})
+
+
+async def handle_archive_rotation_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    data = await request.json()
+    guild_id = data.get("guild_id")
+    channel_id = data.get("channel_id")
+    guild = bot.get_guild(int(guild_id))
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "Guild not found"})
+    try:
+        ch = guild.get_channel(int(channel_id))
+        if ch:
+            await ch.send("⏹ **Rotation stopped.** This channel is now read-only.")
+            ow = ch.overwrites
+            for target, perm in ow.items():
+                perm.update(send_messages=False)
+                ow[target] = perm
+            await ch.edit(overwrites=ow, name=f"closed-{ch.name}"[:100])
+        return aiohttp_web.json_response({"ok": True})
+    except Exception as e:
+        print(f"[rotation] archive channel error: {e}", flush=True)
+        return aiohttp_web.json_response({"ok": False, "error": str(e)})
+
+
 async def start_api_server():
     app = aiohttp_web.Application()
     app.router.add_post("/api/create-report-channel", handle_create_report_channel)
@@ -1782,6 +1870,8 @@ async def start_api_server():
     app.router.add_post("/api/list-categories", handle_list_categories)
     app.router.add_post("/api/create-artifact-channels", handle_create_artifact_channels)
     app.router.add_post("/api/delete-artifact-channels", handle_delete_artifact_channels)
+    app.router.add_post("/api/create-rotation-channel", handle_create_rotation_channel)
+    app.router.add_post("/api/archive-rotation-channel", handle_archive_rotation_channel)
     runner = aiohttp_web.AppRunner(app)
     await runner.setup()
     site = aiohttp_web.TCPSite(runner, "0.0.0.0", 7777)

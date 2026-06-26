@@ -1643,3 +1643,110 @@ async def get_weekly_stats(guild_id: str, since_iso: str) -> dict:
             stats["upcoming_handoffs"] = []
 
         return stats
+
+
+# ── Artifact auto-rotation (bot side) ──────────────────────────────────────
+
+def compute_rotation_state(players: list[dict], started_at_iso: str, now=None) -> dict | None:
+    """Mirror of web/database.compute_rotation_state — live cyclic schedule."""
+    import datetime as _dt
+    if not players:
+        return None
+    holds = [max(1, int(p.get("hold_hours", 48) or 48)) for p in players]
+    cycle_hours = sum(holds)
+    if cycle_hours <= 0:
+        return None
+    try:
+        started = _dt.datetime.fromisoformat(started_at_iso.replace("Z", ""))
+    except Exception:
+        return None
+    now = now or _dt.datetime.utcnow()
+    elapsed_h = (now - started).total_seconds() / 3600.0
+    n = len(players)
+    if elapsed_h < 0:
+        full_cycles, offset = 0, 0.0
+    else:
+        full_cycles = int(elapsed_h // cycle_hours)
+        offset = elapsed_h - full_cycles * cycle_hours
+    acc = 0.0
+    cur_i, win_start_h, win_end_h = 0, 0.0, float(holds[0])
+    for i, h in enumerate(holds):
+        if offset < acc + h or i == n - 1:
+            cur_i = i
+            win_start_h = full_cycles * cycle_hours + acc
+            win_end_h = win_start_h + h
+            break
+        acc += h
+    window_number = full_cycles * n + cur_i
+    win_start = started + _dt.timedelta(hours=win_start_h)
+    win_end = started + _dt.timedelta(hours=win_end_h)
+    next_i = (cur_i + 1) % n
+    return {
+        "current_index": cur_i,
+        "current_player": players[cur_i].get("player_name", ""),
+        "current_hold_hours": holds[cur_i],
+        "notify_hours": int(players[cur_i].get("notify_hours", 6) or 6),
+        "window_number": window_number,
+        "window_start": win_start.isoformat(),
+        "window_end": win_end.isoformat(),
+        "seconds_until_handoff": (win_end - now).total_seconds(),
+        "next_index": next_i,
+        "next_player": players[next_i].get("player_name", ""),
+        "cycle_hours": cycle_hours,
+    }
+
+
+async def get_active_rotations() -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        try:
+            async with db.execute(
+                "SELECT * FROM artifacts WHERE rotation_active=1 AND status='active'"
+            ) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+        except Exception:
+            return []
+
+
+async def get_rotation_players(artifact_id: int, guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM artifact_rotation_players WHERE artifact_id=? AND guild_id=? ORDER BY position",
+            (artifact_id, guild_id),
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def update_rotation_tracking(artifact_id: int, guild_id: str, **fields):
+    allowed = {"rot_last_start_window", "rot_last_notify_window", "current_holder"}
+    sets, params = [], []
+    for k, v in fields.items():
+        if k in allowed:
+            sets.append(f"{k}=?")
+            params.append(v)
+    if not sets:
+        return
+    params += [artifact_id, guild_id]
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            f"UPDATE artifacts SET {', '.join(sets)} WHERE id=? AND guild_id=?", params
+        )
+        await db.commit()
+
+
+async def find_member_discord_id(guild_id: str, player_name: str) -> str | None:
+    """Resolve a Travian player name → discord_id via ally_members."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        try:
+            async with db.execute("""
+                SELECT am.discord_id FROM ally_members am
+                JOIN ally_groups ag ON ag.id = am.ally_group_id
+                WHERE ag.guild_id = ? AND (LOWER(am.travian_name)=LOWER(?) OR LOWER(am.discord_username)=LOWER(?))
+                LIMIT 1
+            """, (guild_id, player_name, player_name)) as cur:
+                row = await cur.fetchone()
+                return row["discord_id"] if row and row["discord_id"] else None
+        except Exception:
+            return None

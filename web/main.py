@@ -17731,6 +17731,9 @@ async def artifact_detail_page(request: Request, guild_id: str, artifact_id: int
     player_name = session.get("player_name", session.get("username", ""))
     saved = request.query_params.get("saved")
     stats = _compute_artifact_stats(artifact, handoffs)
+    rot_state = None
+    if artifact.get("rotation_active") and artifact.get("rotation_started_at") and rotation:
+        rot_state = database.compute_rotation_state(rotation, artifact["rotation_started_at"])
     return templates.TemplateResponse("artifact_detail.html", {
         "request": request, "guild": guild,
         "artifact": artifact, "rotation": rotation,
@@ -17740,6 +17743,7 @@ async def artifact_detail_page(request: Request, guild_id: str, artifact_id: int
         "player_name": player_name,
         "saved": saved,
         "stats": stats,
+        "rot_state": rot_state,
     })
 
 
@@ -17871,6 +17875,106 @@ async def artifact_rotation_save(request: Request, guild_id: str, artifact_id: i
                     "notify_hours": int(notify[i]) if i < len(notify) else 6,
                 })
     await database.save_rotation(artifact_id, guild_id, players)
+    return JSONResponse({"ok": True})
+
+
+@app.get("/guild/{guild_id}/artifacts/{artifact_id}/rotation/state")
+async def artifact_rotation_state(request: Request, guild_id: str, artifact_id: int):
+    """Live rotation state for the detail UI (current holder, countdown, next)."""
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    artifact = await database.get_artifact(artifact_id, guild_id)
+    if not artifact:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    rotation = await database.get_rotation(artifact_id, guild_id)
+    if not artifact.get("rotation_active") or not artifact.get("rotation_started_at"):
+        return JSONResponse({"active": False})
+    state = database.compute_rotation_state(rotation, artifact["rotation_started_at"])
+    if not state:
+        return JSONResponse({"active": False})
+    state["active"] = True
+    state["channel_id"] = artifact.get("rotation_channel_id", "")
+    return JSONResponse(state)
+
+
+@app.post("/guild/{guild_id}/artifacts/{artifact_id}/rotation/start")
+async def artifact_rotation_start(request: Request, guild_id: str, artifact_id: int):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = await _require_guild_async(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    artifact = await database.get_artifact(artifact_id, guild_id)
+    if not artifact:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    rotation = await database.get_rotation(artifact_id, guild_id)
+    if not rotation:
+        return JSONResponse({"error": "no_rotation", "message": "Add players to the rotation first."}, status_code=400)
+
+    # Resolve each player's discord_id for channel access + DMs
+    members = []
+    for p in rotation:
+        m = await database.find_ally_member_by_name(guild_id, p["player_name"])
+        if m and m.get("discord_id"):
+            members.append({"player_name": p["player_name"], "discord_id": m["discord_id"]})
+
+    # Ask the bot to create the dedicated rotation channel
+    channel_id = ""
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.post("http://bot:7777/api/create-rotation-channel", json={
+                "guild_id": guild_id,
+                "artifact_id": artifact_id,
+                "artifact_name": artifact.get("name", "Artifact"),
+                "members": members,
+            })
+            resp = r.json()
+        if resp and resp.get("ok"):
+            channel_id = resp.get("channel_id", "")
+    except Exception as e:
+        print(f"[rotation] channel create failed: {e}", flush=True)
+
+    import datetime as _dt
+    started = _dt.datetime.utcnow().isoformat()
+    await database.set_artifact_rotation_state(
+        artifact_id, guild_id,
+        rotation_active=1,
+        rotation_started_at=started,
+        rotation_channel_id=channel_id,
+        rot_last_start_window=-1,
+        rot_last_notify_window=-1,
+        current_holder=rotation[0]["player_name"],
+    )
+    unresolved = [p["player_name"] for p in rotation
+                  if p["player_name"] not in {m["player_name"] for m in members}]
+    return JSONResponse({"ok": True, "channel_id": channel_id, "unresolved": unresolved})
+
+
+@app.post("/guild/{guild_id}/artifacts/{artifact_id}/rotation/stop")
+async def artifact_rotation_stop(request: Request, guild_id: str, artifact_id: int):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
+    err = await _require_guild_async(session, guild_id)
+    if err: return JSONResponse({"error": "forbidden"}, status_code=403)
+    if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    artifact = await database.get_artifact(artifact_id, guild_id)
+    if not artifact:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    # Archive the rotation channel (best-effort)
+    ch = artifact.get("rotation_channel_id", "")
+    if ch:
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                await client.post("http://bot:7777/api/archive-rotation-channel", json={
+                    "guild_id": guild_id, "channel_id": ch,
+                })
+        except Exception as e:
+            print(f"[rotation] channel archive failed: {e}", flush=True)
+    await database.set_artifact_rotation_state(
+        artifact_id, guild_id, rotation_active=0, rotation_channel_id="",
+    )
     return JSONResponse({"ok": True})
 
 
