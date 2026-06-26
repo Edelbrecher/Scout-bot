@@ -1423,16 +1423,46 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         ctx = {"emoji": "⚙️", "code": str(exc.status_code), "message": str(exc.detail) if exc.detail else "Ein Fehler ist aufgetreten.", "detail": None}
     return templates.TemplateResponse("error.html", {"request": request, **ctx}, status_code=exc.status_code)
 
+_ERROR_WEBHOOK = "https://discord.com/api/webhooks/1519977433686736896/p2VJOcfgAC_2Gf6TLKj2quu9X1Bga1nemhhvlcg-BLZTuk3ivAjBtfdEoGXfhqlg8jGP"
+_error_webhook_recent: dict[str, float] = {}
+
+async def _notify_error_webhook(request: Request, exc: Exception, tb_str: str):
+    """Post error to Discord webhook, deduped per exception type (max 1 per 5 min)."""
+    key = f"{type(exc).__name__}:{request.url.path}"
+    now = time.time()
+    if now - _error_webhook_recent.get(key, 0) < 300:
+        return
+    _error_webhook_recent[key] = now
+    short_tb = tb_str[-1500:] if len(tb_str) > 1500 else tb_str
+    embed = {
+        "title": f"💥 500 — {type(exc).__name__}",
+        "description": f"```\n{str(exc)[:200]}\n```",
+        "color": 0xef4444,
+        "fields": [
+            {"name": "URL", "value": str(request.url)[:200], "inline": True},
+            {"name": "Method", "value": request.method, "inline": True},
+            {"name": "Traceback", "value": f"```\n{short_tb}\n```", "inline": False},
+        ],
+        "footer": {"text": "TravOps Error Alert"},
+    }
+    try:
+        async with httpx.AsyncClient(timeout=5) as c:
+            await c.post(_ERROR_WEBHOOK, json={"embeds": [embed]})
+    except Exception:
+        pass
+
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
     import traceback as _tb
     detail = type(exc).__name__ + ": " + str(exc)
-    print(f"[500] {request.url} → {detail}\n{''.join(_tb.format_exc())}", flush=True)
+    tb_str = ''.join(_tb.format_exc())
+    print(f"[500] {request.url} → {detail}\n{tb_str}", flush=True)
+    asyncio.create_task(_notify_error_webhook(request, exc, tb_str))
     return templates.TemplateResponse("error.html", {
         "request": request,
         "emoji": "💥",
         "code": "500",
-        "message": "Interner Serverfehler.",
+        "message": "Internal Server Error.",
         "detail": detail,
     }, status_code=500)
 
