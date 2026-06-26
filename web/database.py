@@ -1438,6 +1438,7 @@ async def toggle_role_in_field(guild_id: str, role_id: str, field: str) -> bool:
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         await db.execute(f"UPDATE guild_configs SET {field} = ? WHERE guild_id = ?", (new_value, guild_id))
         await db.commit()
+    _CACHE.pop(f"guild:{guild_id}", None)
     return added
 
 
