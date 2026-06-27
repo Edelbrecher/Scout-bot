@@ -16567,16 +16567,16 @@ async def alliance_bonuses_channel_settings_save(request: Request, guild_id: str
 # ═══════════════════════════════════════════════════════════════════════════════
 
 ARTIFACT_TYPES = [
-    ("builder",      "🏗️ Baumeister"),
-    ("troops",       "⚡ Schnellere Truppen"),
-    ("scout",        "🔭 Bessere Späher"),
-    ("crop",         "🌾 Weniger Getreideverbrauch"),
-    ("training",     "🪖 Schnellerer Truppenbau"),
-    ("storage_plan", "📐 Bauplan große Lager"),
-    ("hideout",      "🏚️ Großes Versteck"),
-    ("ww_blueprint", "🏛️ Weltwunder Bauplan"),
-    ("fool",         "🤡 Narrenartefakt"),
-    ("other",        "❓ Sonstiges"),
+    ("builder",      "🏗️ Builder"),
+    ("troops",       "⚡ Faster Troops"),
+    ("scout",        "🔭 Better Scouts"),
+    ("crop",         "🌾 Less Crop Consumption"),
+    ("training",     "🪖 Faster Training"),
+    ("storage_plan", "📐 Great Warehouse/Granary Plan"),
+    ("hideout",      "🏚️ Large Cranny"),
+    ("ww_blueprint", "🏛️ Wonder of the World Blueprint"),
+    ("fool",         "🤡 Fool's Artifact"),
+    ("other",        "❓ Other"),
 ]
 
 ARTIFACT_TYPE_LABELS = {k: v for k, v in ARTIFACT_TYPES}
@@ -16588,6 +16588,8 @@ def _is_leader(session: dict, guild_id: str) -> bool:
     if uid in ADMIN_DISCORD_IDS:
         return True
     for g in (session.get("guilds") or []):
+        if not isinstance(g, dict):
+            continue
         if str(g.get("id")) == guild_id:
             perms = g.get("permissions_new", 0)
             try:

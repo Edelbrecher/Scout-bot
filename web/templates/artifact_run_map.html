@@ -706,7 +706,7 @@ function setupCanvas(){
           }
         }
         if(hitNatar&&hitNatarArt){
-          if(confirm(`Artefakt "${hitNatarArt.name}" bei (${hitNatar.x}|${hitNatar.y}) platzieren?`)){
+          if(confirm(`Place artifact "${hitNatarArt.name}" at (${hitNatar.x}|${hitNatar.y})?`)){
             await assignArtifactCoords(hitNatarArt.id, hitNatar.x, hitNatar.y);
           }
           return;

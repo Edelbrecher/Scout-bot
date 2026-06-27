@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Artefakt-Planung · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Artifact Planning · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <style>
@@ -43,25 +43,25 @@
   <!-- Header -->
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.5rem;">
     <div>
-      <a href="/guild/{{ guild.guild_id }}/artifacts" class="back-link">← Artefakte</a>
-      <h1 style="margin:.25rem 0 0;">Artefakt-Planung</h1>
-      <p class="subtitle" style="margin:0;">Laufzeiten &amp; Kata-Empfehlungen für Artefakt-Runs</p>
+      <a href="/guild/{{ guild.guild_id }}/artifacts" class="back-link">← Artifacts</a>
+      <h1 style="margin:.25rem 0 0;">Artifact Planning</h1>
+      <p class="subtitle" style="margin:0;">Travel times &amp; catapult recommendations for artifact runs</p>
     </div>
   </div>
 
   {% if request.query_params.get('saved') %}
-  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Einstellungen gespeichert.</div>
+  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Settings saved.</div>
   {% endif %}
 
   <!-- Settings Panel -->
   <div class="ap-card" style="margin-bottom:1.5rem;">
-    <div class="ap-section-title">Konfiguration</div>
+    <div class="ap-section-title">Configuration</div>
     <form method="post" action="/guild/{{ guild.guild_id }}/artifacts/planning/settings" id="settingsForm">
 
       <div style="display:flex;gap:2rem;flex-wrap:wrap;margin-bottom:1.2rem;align-items:flex-start;">
         <!-- Sector picker (same as sector monitor) -->
         <div>
-          <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.5rem;">Sektor auswählen</div>
+          <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.5rem;">Select Sector</div>
           {% set cells = [
             ('NW', -200,   0,   0, 200, 'NW'),
             ('NE',    0,   0, 200, 200, 'NE'),
@@ -107,19 +107,19 @@
 
         <!-- Troop speed -->
         <div style="min-width:240px;">
-          <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.5rem;">Truppengeschwindigkeit</label>
+          <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.5rem;">Troop Speed</label>
           <select name="troop_speed" class="form-input" style="width:100%;">
             {% set speeds = [
-              (3, "Katapult — 3"),
-              (4, "Ramme — 4"),
-              (5, "Prätorianer / Speerträger — 5"),
-              (6, "Legionär / Phalanx / Keulenschwinger — 6"),
-              (7, "Imperianer / Axtkrieger — 7"),
-              (9, "Teutonischer Ritter — 9"),
+              (3, "Catapult — 3"),
+              (4, "Ram — 4"),
+              (5, "Praetorian / Spearman — 5"),
+              (6, "Legionnaire / Phalanx / Clubswinger — 6"),
+              (7, "Imperian / Axeman — 7"),
+              (9, "Teutonic Knight — 9"),
               (10, "Equites Caesaris / Paladin — 10"),
-              (13, "Häduer — 13"),
-              (14, "Equites Imperiatoris / Druidenreiter — 14"),
-              (16, "Equites Legati / Theutates-Donner — 16"),
+              (13, "Haeduan — 13"),
+              (14, "Equites Imperatoris / Druidrider — 14"),
+              (16, "Equites Legati / Theutates Thunder — 16"),
             ] %}
             {% for spd, label in speeds %}
             <option value="{{ spd }}" {% if settings.troop_speed|int == spd %}selected{% endif %}>{{ label }}</option>
@@ -136,7 +136,7 @@
 
       <!-- Artifact Types -->
       <div style="margin-bottom:1rem;">
-        <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.5rem;">Artefakt-Typen</div>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.5rem;">Artifact Types</div>
         <div style="display:flex;flex-wrap:wrap;gap:.5rem;">
           {% for key, label in spawn_type_labels.items() %}
           <label style="display:flex;align-items:center;gap:.35rem;font-size:.82rem;cursor:pointer;padding:.3rem .7rem;border:1px solid var(--border);border-radius:8px;transition:border-color .15s;"
@@ -152,7 +152,7 @@
 
       <!-- Sizes -->
       <div style="margin-bottom:1.2rem;">
-        <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.5rem;">Artefakt-Größen</div>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.5rem;">Artifact Sizes</div>
         <div style="display:flex;gap:.5rem;">
           {% for size, slabel in [("unique","Unique"),("great","Great"),("slight","Slight")] %}
           <label style="display:flex;align-items:center;gap:.35rem;font-size:.82rem;cursor:pointer;padding:.3rem .7rem;border:1px solid var(--border);border-radius:8px;">
@@ -165,15 +165,15 @@
         </div>
       </div>
 
-      <button type="button" class="btn btn-primary" onclick="saveAndAnalyze()">Speichern &amp; Analyse laden</button>
-      <button type="button" class="btn btn-secondary" onclick="loadAnalysis()" style="margin-left:.5rem;">Analyse aktualisieren</button>
+      <button type="button" class="btn btn-primary" onclick="saveAndAnalyze()">Save &amp; Analyze</button>
+      <button type="button" class="btn btn-secondary" onclick="loadAnalysis()" style="margin-left:.5rem;">Refresh Analysis</button>
     </form>
   </div>
 
   <!-- Analysis Output -->
   <div id="analysisArea">
     <div class="empty-state" id="emptyHint">
-      <p>Sektor und Artefakt-Typen konfigurieren, dann auf <strong>Speichern &amp; Analyse laden</strong> klicken.</p>
+      <p>Configure sector and artifact types, then click <strong>Save &amp; Analyze</strong>.</p>
     </div>
   </div>
 
@@ -264,15 +264,15 @@ function offBar(off, maxOff) {
 function renderResults(data) {
   const area = document.getElementById("analysisArea");
   if (!data.results || data.results.length === 0) {
-    area.innerHTML = `<div class="empty-state"><div style="font-size:2.5rem">🔍</div><p>Keine Artefakte im gewählten Sektor gefunden.<br>Bitte Sektor-Koordinaten anpassen.</p></div>`;
+    area.innerHTML = `<div class="empty-state"><div style="font-size:2.5rem">🔍</div><p>No artifacts found in the selected sector.<br>Please adjust the sector coordinates.</p></div>`;
     return;
   }
 
   const maxOff = Math.max(...data.results.flatMap(r => r.members.map(m => m.total_off || 0)));
 
   let html = `<div style="margin-bottom:.75rem;font-size:.83rem;color:var(--text-muted);">
-    ${data.results.length} Artefakte im Sektor · ${data.member_count} Member mit Truppendaten
-    · Geschwindigkeit: ${data.settings.troop_speed} Felder/h · Weltengeschwindigkeit: x${data.settings.world_speed}
+    ${data.results.length} artifacts in sector · ${data.member_count} members with troop data
+    · Speed: ${data.settings.troop_speed} fields/h · World speed: x${data.settings.world_speed}
   </div>`;
 
   html += `<div class="artifact-grid">`;
@@ -283,12 +283,12 @@ function renderResults(data) {
 
     let membersHtml = "";
     if (r.members.length === 0) {
-      membersHtml = `<div style="font-size:.82rem;color:var(--text-muted);padding:.5rem 0;">Keine Member mit Truppendaten gefunden.</div>`;
+      membersHtml = `<div style="font-size:.82rem;color:var(--text-muted);padding:.5rem 0;">No members with troop data found.</div>`;
     } else {
       const showAll = r.members.length <= 5;
       membersHtml = `<table class="rank-table">
         <thead><tr>
-          <th>#</th><th>Spieler</th><th>Bestes Dorf</th><th>Distanz</th><th>Laufzeit</th><th>Off-Stärke</th>
+          <th>#</th><th>Player</th><th>Best Village</th><th>Distance</th><th>Travel Time</th><th>Off Strength</th>
         </tr></thead><tbody>`;
       r.members.forEach((m, i) => {
         const vml = mapLink(m.best_village.x, m.best_village.y);
@@ -300,7 +300,7 @@ function renderResults(data) {
             <span style="font-size:.72rem;color:var(--text-muted);">${m.best_village.x}|${m.best_village.y}
             ${m.best_village.ts > 0 ? `· TS${m.best_village.ts}` : ''}
             ${vml ? `<a href="${vml}" target="_blank" class="map-link"> 🗺️</a>` : ''}</span></td>
-          <td>${m.best_village.distance} Felder</td>
+          <td>${m.best_village.distance} fields</td>
           <td class="travel-hr">${fmtHours(m.best_village.travel_hours)}</td>
           <td>${(m.total_off||0).toLocaleString()}${offBar(m.total_off, maxOff)}</td>
         </tr>`;
@@ -308,7 +308,7 @@ function renderResults(data) {
       if (!showAll) {
         membersHtml += `<tr><td colspan="6" style="text-align:center;padding:.4rem;">
           <span class="collapsible-toggle" style="font-size:.78rem;color:var(--primary);"
-            onclick="toggleRows(this)">▼ ${r.members.length - 5} weitere anzeigen</span>
+            onclick="toggleRows(this)">▼ show ${r.members.length - 5} more</span>
         </td></tr>`;
       }
       membersHtml += `</tbody></table>`;
@@ -320,12 +320,12 @@ function renderResults(data) {
       const ke = r.kata_existing;
       const kml = mapLink(ke.x, ke.y);
       kataAHtml = `<div class="kata-box kata-a">
-        <div class="kata-label kata-label-a">A — Bestes vorhandenes Kata-Dorf</div>
+        <div class="kata-label kata-label-a">A — Best existing catapult village</div>
         <strong>${ke.player}</strong> · ${ke.village} (${ke.x}|${ke.y})
         ${kml ? `<a href="${kml}" target="_blank" class="map-link">🗺️</a>` : ""}
         <br>
         <span style="color:var(--text-muted);font-size:.78rem;">
-          ${ke.distance} Felder · ${fmtHours(ke.travel_hours)} Laufzeit
+          ${ke.distance} fields · ${fmtHours(ke.travel_hours)} travel time
           · Off: ${(ke.off||0).toLocaleString()}
         </span>
       </div>`;
@@ -337,12 +337,12 @@ function renderResults(data) {
       const ko = r.kata_optimal;
       const koml = mapLink(ko.x, ko.y);
       kataBHtml = `<div class="kata-box kata-b">
-        <div class="kata-label kata-label-b">B — Optimaler neuer Kata-Dorf-Standort</div>
-        Koordinaten: <strong>${ko.x}|${ko.y}</strong>
+        <div class="kata-label kata-label-b">B — Optimal new catapult village location</div>
+        Coordinates: <strong>${ko.x}|${ko.y}</strong>
         ${koml ? `<a href="${koml}" target="_blank" class="map-link">🗺️</a>` : ""}
         <br>
         <span style="color:var(--text-muted);font-size:.78rem;">
-          ${ko.distance_to_artifact} Felder zum Artefakt · ${fmtHours(ko.travel_hours)} Laufzeit (ohne TS)
+          ${ko.distance_to_artifact} fields to artifact · ${fmtHours(ko.travel_hours)} travel time (no TS)
         </span>
       </div>`;
     }
@@ -356,7 +356,7 @@ function renderResults(data) {
           <div class="artifact-coords">
             Est. Spawn: ${s.x}|${s.y}
             ${ml ? `<a href="${ml}" target="_blank" class="map-link">🗺️</a>` : ""}
-            ${s.custom ? ' <span style="color:#fbbf24;font-size:.68rem;">· angepasst</span>' : '· geschätzt'}
+            ${s.custom ? ' <span style="color:#fbbf24;font-size:.68rem;">· custom</span>' : '· estimated'}
           </div>
         </div>
       </div>
@@ -375,14 +375,14 @@ function toggleRows(el) {
   const showing = hidden[0]?.style.display !== "none" && hidden[0]?.style.display !== "" ? false : true;
   hidden.forEach(r => r.style.display = showing ? "table-row" : "none");
   el.textContent = showing
-    ? `▲ weniger anzeigen`
-    : `▼ ${hidden.length} weitere anzeigen`;
+    ? `▲ show less`
+    : `▼ show ${hidden.length} more`;
 }
 
 async function loadAnalysis() {
   const area = document.getElementById("analysisArea");
   area.innerHTML = `<div style="text-align:center;padding:3rem;color:var(--text-muted);">
-    <span class="spinner"></span> Analyse wird berechnet…
+    <span class="spinner"></span> Computing analysis…
   </div>`;
   try {
     // Pass current UI values as query params so no save is needed before analyzing
@@ -401,7 +401,7 @@ async function loadAnalysis() {
     const data = await resp.json();
     renderResults(data);
   } catch(e) {
-    area.innerHTML = `<div class="empty-state"><p style="color:#f87171;">Fehler beim Laden: ${e.message}</p></div>`;
+    area.innerHTML = `<div class="empty-state"><p style="color:#f87171;">Error loading analysis: ${e.message}</p></div>`;
   }
 }
 

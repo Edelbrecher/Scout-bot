@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Artefakte · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Artifacts · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 <style>
@@ -73,31 +73,31 @@ body.bulk-mode .art-card { padding-left:2.4rem; cursor:pointer; }
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.5rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:.25rem 0 0;">🏺 Artefakte</h1>
-      <p class="subtitle" style="margin:0;">Artefakt-Verwaltung &amp; Rotationsplanung</p>
+      <h1 style="margin:.25rem 0 0;">🏺 Artifacts</h1>
+      <p class="subtitle" style="margin:0;">Artifact Management &amp; Rotation Planning</p>
     </div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end;">
-      <a href="/guild/{{ guild.guild_id }}/artifacts/planning" class="btn btn-secondary">Planung</a>
+      <a href="/guild/{{ guild.guild_id }}/artifacts/planning" class="btn btn-secondary">Planning</a>
       <a href="/guild/{{ guild.guild_id }}/artifacts/run-map" class="btn btn-secondary">🗺️ Run Map</a>
       <a href="/guild/{{ guild.guild_id }}/my-treasury" class="btn btn-secondary">🏛️ My Treasury</a>
       {% if is_leader %}
       <a href="/guild/{{ guild.guild_id }}/all-treasuries" class="btn btn-secondary">👥 All Treasuries</a>
-      <button id="bulkToggleBtn" onclick="toggleBulkMode()" class="btn btn-secondary">☑️ Auswahl</button>
-      <button onclick="document.getElementById('addArtModal').classList.add('open')" class="btn btn-primary">+ Artefakt</button>
+      <button id="bulkToggleBtn" onclick="toggleBulkMode()" class="btn btn-secondary">☑️ Select</button>
+      <button onclick="document.getElementById('addArtModal').classList.add('open')" class="btn btn-primary">+ Artifact</button>
       {% endif %}
     </div>
   </div>
 
   {% if saved %}
-  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Gespeichert.</div>
+  <div class="alert alert-success" style="margin-bottom:1rem;">✅ Saved.</div>
   {% endif %}
 
   {% if not artifacts %}
   <div style="text-align:center;padding:4rem 1rem;color:var(--text-muted);">
     <div style="font-size:3rem;margin-bottom:1rem;">🏺</div>
-    <p>Noch keine Artefakte erfasst.</p>
+    <p>No artifacts recorded yet.</p>
     {% if is_leader %}
-    <button onclick="document.getElementById('addArtModal').classList.add('open')" class="btn btn-primary" style="margin-top:.5rem;">+ Erstes Artefakt hinzufügen</button>
+    <button onclick="document.getElementById('addArtModal').classList.add('open')" class="btn btn-primary" style="margin-top:.5rem;">+ Add First Artifact</button>
     {% endif %}
   </div>
   {% else %}
@@ -107,10 +107,10 @@ body.bulk-mode .art-card { padding-left:2.4rem; cursor:pointer; }
   {% set unique_arts = artifacts | selectattr('artifact_size','equalto','unique') | list %}
   <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem;">
     <div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:10px;padding:.45rem .9rem;font-size:.82rem;">
-      🏺 <strong>{{ artifacts|length }}</strong> gesamt
+      🏺 <strong>{{ artifacts|length }}</strong> total
     </div>
     <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:10px;padding:.45rem .9rem;font-size:.82rem;">
-      <span class="status-dot dot-active"></span><strong>{{ active_arts|length }}</strong> aktiv
+      <span class="status-dot dot-active"></span><strong>{{ active_arts|length }}</strong> active
     </div>
     {% if unique_arts %}
     <div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:.45rem .9rem;font-size:.82rem;">
@@ -128,21 +128,21 @@ body.bulk-mode .art-card { padding-left:2.4rem; cursor:pointer; }
 
     <!-- Status -->
     <span style="font-size:.75rem;color:var(--text-muted);">Status:</span>
-    <button onclick="bulkSetStatus('active')"   class="btn btn-secondary" style="font-size:.75rem;padding:.25rem .6rem;"><span class="status-dot dot-active"  ></span>Aktiv</button>
-    <button onclick="bulkSetStatus('inactive')" class="btn btn-secondary" style="font-size:.75rem;padding:.25rem .6rem;"><span class="status-dot dot-inactive"></span>Inaktiv</button>
+    <button onclick="bulkSetStatus('active')"   class="btn btn-secondary" style="font-size:.75rem;padding:.25rem .6rem;"><span class="status-dot dot-active"  ></span>Active</button>
+    <button onclick="bulkSetStatus('inactive')" class="btn btn-secondary" style="font-size:.75rem;padding:.25rem .6rem;"><span class="status-dot dot-inactive"></span>Inactive</button>
     <button onclick="bulkSetStatus('lost')"     class="btn btn-secondary" style="font-size:.75rem;padding:.25rem .6rem;"><span class="status-dot dot-lost"    ></span>Lost</button>
 
     <span style="color:var(--border);font-size:1rem;">|</span>
 
     <!-- Size -->
-    <span style="font-size:.75rem;color:var(--text-muted);">Größe:</span>
-    <button onclick="bulkSetSize('small')"  class="btn btn-secondary" style="font-size:.75rem;padding:.25rem .6rem;">🔵 Klein</button>
-    <button onclick="bulkSetSize('large')"  class="btn btn-secondary" style="font-size:.75rem;padding:.25rem .6rem;">🟡 Groß</button>
+    <span style="font-size:.75rem;color:var(--text-muted);">Size:</span>
+    <button onclick="bulkSetSize('small')"  class="btn btn-secondary" style="font-size:.75rem;padding:.25rem .6rem;">🔵 Small</button>
+    <button onclick="bulkSetSize('large')"  class="btn btn-secondary" style="font-size:.75rem;padding:.25rem .6rem;">🟡 Large</button>
     <button onclick="bulkSetSize('unique')" class="btn btn-secondary" style="font-size:.75rem;padding:.25rem .6rem;">⭐ Unique</button>
 
     <span style="color:var(--border);font-size:1rem;">|</span>
 
-    <button onclick="bulkDelete()" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#f87171;border-radius:7px;padding:.28rem .65rem;cursor:pointer;font-size:.75rem;font-weight:600;">🗑 Löschen</button>
+    <button onclick="bulkDelete()" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#f87171;border-radius:7px;padding:.28rem .65rem;cursor:pointer;font-size:.75rem;font-weight:600;">🗑 Delete</button>
     <button onclick="clearSelection()" style="background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:7px;padding:.28rem .6rem;cursor:pointer;font-size:.75rem;">✕</button>
   </div>
   {% endif %}
@@ -163,7 +163,7 @@ body.bulk-mode .art-card { padding-left:2.4rem; cursor:pointer; }
        onclick="return cardClick(event, {{ a.id }}, this)">
       <div>
         <span class="size-badge size-{{ a.artifact_size }}">
-          {% if a.artifact_size == 'unique' %}⭐ Unique{% elif a.artifact_size == 'large' %}🟡 Groß{% else %}🔵 Klein{% endif %}
+          {% if a.artifact_size == 'unique' %}⭐ Unique{% elif a.artifact_size == 'large' %}🟡 Large{% else %}🔵 Small{% endif %}
         </span>
         <span style="float:right;font-size:.75rem;color:var(--text-muted);">
           <span class="status-dot dot-{{ a.status }}"></span>{{ a.status }}
@@ -172,13 +172,13 @@ body.bulk-mode .art-card { padding-left:2.4rem; cursor:pointer; }
       <div class="art-name">{{ artifact_type_labels.get(a.artifact_type, a.artifact_type) }}</div>
       <div class="art-meta">{{ a.name }}</div>
       {% if a.effect_scope == 'all' %}
-      <div style="font-size:.72rem;color:#f59e0b;margin-top:.2rem;">Wirkung: alle Dörfer</div>
+      <div style="font-size:.72rem;color:#f59e0b;margin-top:.2rem;">Scope: all villages</div>
       {% else %}
-      <div style="font-size:.72rem;color:var(--text-muted);margin-top:.2rem;">Wirkung: Dorf</div>
+      <div style="font-size:.72rem;color:var(--text-muted);margin-top:.2rem;">Scope: village</div>
       {% endif %}
       {% if a.current_holder %}
       <div class="art-holder">
-        <div class="label">Aktueller Halter</div>
+        <div class="label">Current Holder</div>
         <div style="font-weight:700;">{{ a.current_holder }}</div>
         {% if a.current_village %}<div style="color:var(--text-muted);font-size:.75rem;">📍 {{ a.current_village }}</div>{% endif %}
       </div>
@@ -200,13 +200,13 @@ body.bulk-mode .art-card { padding-left:2.4rem; cursor:pointer; }
 <div id="addArtModal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
-      <h2 style="margin:0;font-size:1.1rem;">🏺 Artefakt hinzufügen</h2>
+      <h2 style="margin:0;font-size:1.1rem;">🏺 Add Artifact</h2>
       <button onclick="document.getElementById('addArtModal').classList.remove('open')" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;">&times;</button>
     </div>
     <form method="POST" action="/guild/{{ guild.guild_id }}/artifacts/add">
       <div style="display:grid;gap:.85rem;">
         <div>
-          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Artefakt-Typ</label>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Artifact Type</label>
           <select name="artifact_type" class="form-control" required>
             {% for key, label in artifact_types %}
             <option value="{{ key }}">{{ label }}</option>
@@ -215,29 +215,29 @@ body.bulk-mode .art-card { padding-left:2.4rem; cursor:pointer; }
         </div>
         <div>
           <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Name</label>
-          <input name="name" class="form-control" placeholder="z.B. Baumeister VIII (4×)" required>
+          <input name="name" class="form-control" placeholder="e.g. Builder VIII (4×)" required>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
           <div>
-            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Größe</label>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Size</label>
             <select name="artifact_size" class="form-control">
-              <option value="small">🔵 Klein (Schatz 10)</option>
-              <option value="large">🟡 Groß (Schatz 20)</option>
-              <option value="unique">⭐ Unique (Schatz 20)</option>
+              <option value="small">🔵 Small (Treasury 10)</option>
+              <option value="large">🟡 Large (Treasury 20)</option>
+              <option value="unique">⭐ Unique (Treasury 20)</option>
             </select>
           </div>
           <div>
-            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Wirkung</label>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Scope</label>
             <select name="effect_scope" class="form-control">
-              <option value="village">Dorf</option>
-              <option value="all">Alle Dörfer</option>
+              <option value="village">Village</option>
+              <option value="all">All Villages</option>
             </select>
           </div>
         </div>
 
         <!-- Koordinaten mit Auto-Fill -->
         <div>
-          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">📍 Koordinaten des Artefakt-Dorfes</label>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">📍 Artifact Village Coordinates</label>
           <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:.4rem;align-items:end;">
             <div>
               <label style="font-size:.72rem;color:var(--text-muted);">X</label>
@@ -254,29 +254,29 @@ body.bulk-mode .art-card { padding-left:2.4rem; cursor:pointer; }
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
           <div>
-            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Aktueller Halter</label>
-            <input id="add_holder" name="current_holder" class="form-control" placeholder="Auto aus Koordinaten">
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Current Holder</label>
+            <input id="add_holder" name="current_holder" class="form-control" placeholder="Auto from coordinates">
           </div>
           <div>
-            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Aktuelles Dorf</label>
-            <input id="add_village" name="current_village" class="form-control" placeholder="Auto aus Koordinaten">
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Current Village</label>
+            <input id="add_village" name="current_village" class="form-control" placeholder="Auto from coordinates">
           </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
           <div>
-            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Erobert am</label>
-            <input name="conquered_at" class="form-control" placeholder="05.06.2026 14:32">
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Conquered At</label>
+            <input name="conquered_at" class="form-control" placeholder="2026-06-05 14:32">
           </div>
           <div>
-            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Aktiviert am</label>
-            <input name="activated_at" class="form-control" placeholder="06.06.2026 14:32">
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Activated At</label>
+            <input name="activated_at" class="form-control" placeholder="2026-06-06 14:32">
           </div>
         </div>
         <div>
-          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Notizen</label>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Notes</label>
           <textarea name="notes" class="form-control" rows="2"></textarea>
         </div>
-        <button type="submit" class="btn btn-primary" style="width:100%;">✅ Artefakt speichern</button>
+        <button type="submit" class="btn btn-primary" style="width:100%;">✅ Save Artifact</button>
       </div>
     </form>
   </div>
@@ -293,7 +293,7 @@ function toggleBulkMode() {
   document.body.classList.toggle('bulk-mode', bulkMode);
   const btn = document.getElementById('bulkToggleBtn');
   btn.className = 'btn ' + (bulkMode ? 'btn-primary' : 'btn-secondary');
-  btn.textContent = bulkMode ? '✕ Auswahl beenden' : '☑️ Auswahl';
+  btn.textContent = bulkMode ? '✕ End Selection' : '☑️ Select';
   if (!bulkMode) clearSelection();
 }
 
@@ -340,7 +340,7 @@ function updateBulkBar() {
   if (!bar) return;
   if (selectedIds.size > 0) {
     bar.classList.add('visible');
-    cnt.textContent = selectedIds.size + ' ausgewählt';
+    cnt.textContent = selectedIds.size + ' selected';
   } else {
     bar.classList.remove('visible');
   }
@@ -349,7 +349,7 @@ function updateBulkBar() {
 // ── Bulk actions ───────────────────────────────────────────────────────────
 async function bulkDelete() {
   if (!selectedIds.size) return;
-  if (!confirm(`${selectedIds.size} Artefakt(e) wirklich löschen?`)) return;
+  if (!confirm(`Delete ${selectedIds.size} artifact(s)?`)) return;
   const r = await fetch(`/guild/${GUILD_ID}/artifacts/bulk-delete`, {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ids:[...selectedIds]})
@@ -396,7 +396,7 @@ async function lookupVillage() {
     if (!d.found) {
       info.style.display = 'block';
       info.style.borderColor = 'rgba(239,68,68,.3)';
-      info.innerHTML = `<span style="color:#f87171;">⚠️ Kein Dorf bei (${x}|${y}) gefunden.</span>`;
+      info.innerHTML = `<span style="color:#f87171;">⚠️ No village found at (${x}|${y}).</span>`;
       return;
     }
     // Auto-fill fields
