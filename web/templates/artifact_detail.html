@@ -526,11 +526,20 @@
           </div>
         </div>
         <div>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Alliance</label>
+          <input name="alliance_name" class="form-control" value="{{ artifact.alliance_name or '' }}" placeholder="e.g. ALLY">
+        </div>
+        <div style="display:flex;align-items:center;gap:.5rem;padding:.35rem .6rem;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:6px;">
+          <input type="checkbox" name="is_target" value="1" {% if artifact.is_target %}checked{% endif %} style="width:auto;accent-color:#f59e0b;">
+          <label style="margin:0;font-size:.78rem;color:#f59e0b;font-weight:600;">🎯 Conquest Target</label>
+        </div>
+        <div>
           <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Status</label>
           <select name="status" class="form-control">
             <option value="active"   {% if artifact.status=='active'   %}selected{% endif %}>active</option>
             <option value="inactive" {% if artifact.status=='inactive' %}selected{% endif %}>inactive</option>
             <option value="lost"     {% if artifact.status=='lost'     %}selected{% endif %}>lost</option>
+            <option value="target"   {% if artifact.status=='target'   %}selected{% endif %}>target</option>
           </select>
         </div>
         <div>

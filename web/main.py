@@ -17492,12 +17492,24 @@ async def artifacts_page(request: Request, guild_id: str):
     artifacts = await database.get_artifacts(guild_id)
     is_leader = _is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")
     saved = request.query_params.get("saved")
+    ag = await database.get_ally_group_for_guild(guild_id)
+    own_names: set[str] = set()
+    if ag:
+        for v in [ag.get("ally_name"), ag.get("wing1_name"), ag.get("wing2_name")]:
+            if v:
+                own_names.add(v.strip().upper())
+    meta_groups = await database.get_meta_groups(guild_id)
+    for mg in meta_groups:
+        for a in mg.get("alliances", []):
+            if a:
+                own_names.add(a.strip().upper())
     return templates.TemplateResponse("artifacts.html", {
         "request": request, "guild": guild,
         "artifacts": artifacts, "is_leader": is_leader,
         "artifact_types": ARTIFACT_TYPES,
         "artifact_type_labels": ARTIFACT_TYPE_LABELS,
         "saved": saved,
+        "own_alliance_names": own_names,
     })
 
 
@@ -17534,6 +17546,8 @@ async def artifact_add(request: Request, guild_id: str):
         notes=form.get("notes","").strip(),
         x=int(form.get("x") or 0),
         y=int(form.get("y") or 0),
+        alliance_name=form.get("alliance_name","").strip(),
+        is_target=1 if form.get("is_target") else 0,
     )
     return RedirectResponse(f"/guild/{guild_id}/artifacts/{aid}?saved=1", status_code=303)
 
@@ -17787,6 +17801,8 @@ async def artifact_update(request: Request, guild_id: str, artifact_id: int):
         notes=form.get("notes","").strip(),
         x=int(form.get("x") or 0),
         y=int(form.get("y") or 0),
+        alliance_name=form.get("alliance_name","").strip(),
+        is_target=1 if form.get("is_target") else 0,
     )
     return RedirectResponse(f"/guild/{guild_id}/artifacts/{artifact_id}?saved=1", status_code=303)
 

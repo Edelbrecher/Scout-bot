@@ -12625,6 +12625,15 @@ async def _init_artifact_tables():
                 await db.commit()
             except Exception:
                 pass
+        for col in [
+            "alliance_name TEXT DEFAULT ''",
+            "is_target INTEGER DEFAULT 0",
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE artifacts ADD COLUMN {col}")
+                await db.commit()
+            except Exception:
+                pass
         # Migration: is_test column for ally_treasuries
         try:
             await db.execute("ALTER TABLE ally_treasuries ADD COLUMN is_test INTEGER DEFAULT 0")
@@ -13150,18 +13159,20 @@ async def create_artifact(guild_id: str, name: str, artifact_type: str,
                            artifact_size: str, effect_scope: str,
                            conquered_at: str, activated_at: str,
                            current_holder: str, current_village: str,
-                           notes: str, x: int = 0, y: int = 0) -> int:
+                           notes: str, x: int = 0, y: int = 0,
+                           alliance_name: str = "", is_target: int = 0) -> int:
     now = __import__('datetime').datetime.utcnow().isoformat()
+    status = "target" if is_target else "active"
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         cur = await db.execute("""
             INSERT INTO artifacts
               (guild_id, name, artifact_type, artifact_size, effect_scope,
                conquered_at, activated_at, current_holder, current_village,
-               status, notes, x, y, created_at, updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,'active',?,?,?,?,?)
+               status, notes, x, y, alliance_name, is_target, created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (guild_id, name, artifact_type, artifact_size, effect_scope,
               conquered_at, activated_at, current_holder, current_village,
-              notes, x, y, now, now))
+              status, notes, x, y, alliance_name, is_target, now, now))
         await db.commit()
         return cur.lastrowid
 
@@ -13170,7 +13181,7 @@ async def update_artifact(artifact_id: int, guild_id: str, **kwargs) -> bool:
     now = __import__('datetime').datetime.utcnow().isoformat()
     allowed = {"name","artifact_type","artifact_size","effect_scope","conquered_at",
                "activated_at","activation_override","current_holder","current_village",
-               "status","notes","x","y"}
+               "status","notes","x","y","alliance_name","is_target"}
     sets = {k: v for k, v in kwargs.items() if k in allowed}
     if not sets:
         return False
