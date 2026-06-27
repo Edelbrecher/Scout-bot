@@ -11646,7 +11646,7 @@ async def admin_extend_trial(request: Request, discord_user_id: str, days: int =
     async with __import__("aiosqlite").connect(database.DB_PATH) as db:
         # Get current expires_at
         async with db.execute(
-            "SELECT subscription_expires_at, subscription_status FROM user_subscriptions WHERE discord_user_id=?",
+            "SELECT expires_at, subscription_status FROM user_subscriptions WHERE discord_user_id=?",
             (discord_user_id,)
         ) as cur:
             row = await cur.fetchone()
@@ -11663,11 +11663,11 @@ async def admin_extend_trial(request: Request, discord_user_id: str, days: int =
         current_status = (row[1] if row else None) or "trialing"
         new_status = current_status if current_status in ("active", "trialing") else "trialing"
         await db.execute("""
-            INSERT INTO user_subscriptions (discord_user_id, subscription_status, subscription_expires_at, updated_at)
+            INSERT INTO user_subscriptions (discord_user_id, subscription_status, expires_at, updated_at)
             VALUES (?, ?, ?, datetime('now'))
             ON CONFLICT(discord_user_id) DO UPDATE SET
                 subscription_status = ?,
-                subscription_expires_at = ?,
+                expires_at = ?,
                 updated_at = datetime('now')
         """, (discord_user_id, new_status, new_expires, new_status, new_expires))
         await db.commit()
