@@ -189,7 +189,7 @@
 
         <!-- RIGHT: Equipment slots 2×3 grid -->
         <div style="padding:1rem 1.2rem;display:flex;flex-direction:column;justify-content:center;gap:.6rem;">
-          <div style="font-size:.68rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.1rem;">⚔️ Ausrüstung</div>
+          <div style="font-size:.68rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.1rem;">⚔️ Equipment</div>
           <div id="hsSlotGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;">
             <!-- Slots injected by JS -->
           </div>
@@ -199,21 +199,21 @@
       <!-- Player info -->
       <div style="border-top:1px solid var(--border);padding:.9rem 1.4rem;display:grid;grid-template-columns:1.4fr 1fr 0.7fr 1fr;gap:.6rem;">
         <div>
-          <label style="font-size:.68rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.2rem;">👤 Spielername *</label>
-          <input id="hs_player" type="text" placeholder="Exakter Travian-Name"
+          <label style="font-size:.68rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.2rem;">👤 Player Name *</label>
+          <input id="hs_player" type="text" placeholder="Exact Travian name"
             style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.38rem .6rem;font-size:.85rem;">
         </div>
         <div>
-          <label style="font-size:.68rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.2rem;">🏛️ Volk</label>
+          <label style="font-size:.68rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.2rem;">🏛️ Tribe</label>
           <select id="hs_tribe" onchange="hsUpdateTribe(this.value)"
             style="width:100%;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.38rem .6rem;font-size:.85rem;">
-            <option value="">— unbekannt —</option>
-            <option value="römer">🏛️ Römer</option>
-            <option value="teutonen">⚒️ Teutonen</option>
-            <option value="gallier">🍀 Gallier</option>
-            <option value="ägypter">☀️ Ägypter</option>
-            <option value="hunnen">🏹 Hunnen</option>
-            <option value="spartaner">⚔️ Spartaner</option>
+            <option value="">— unknown —</option>
+            <option value="römer">🏛️ Romans</option>
+            <option value="teutonen">⚒️ Teutons</option>
+            <option value="gallier">🍀 Gauls</option>
+            <option value="ägypter">☀️ Egyptians</option>
+            <option value="hunnen">🏹 Huns</option>
+            <option value="spartaner">⚔️ Spartans</option>
           </select>
         </div>
         <div>
@@ -222,8 +222,8 @@
             style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.38rem .6rem;font-size:.85rem;">
         </div>
         <div>
-          <label style="font-size:.68rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.2rem;">🏆 Allianz</label>
-          <input id="hs_alliance" type="text" placeholder="Tag oder Name"
+          <label style="font-size:.68rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.2rem;">🏆 Alliance</label>
+          <input id="hs_alliance" type="text" placeholder="Tag or name"
             style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.38rem .6rem;font-size:.85rem;">
         </div>
       </div>
@@ -236,8 +236,8 @@
             style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.38rem .6rem;font-size:.85rem;">
         </div>
         <div>
-          <label style="font-size:.68rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.2rem;">📝 Notizen</label>
-          <input id="hs_notes" type="text" placeholder="z.B. Screenshot-Fund, Uhrzeit…"
+          <label style="font-size:.68rem;color:var(--text-muted);font-weight:600;display:block;margin-bottom:.2rem;">📝 Notes</label>
+          <input id="hs_notes" type="text" placeholder="e.g. screenshot, time…"
             style="width:100%;box-sizing:border-box;background:var(--bg-main);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:.38rem .6rem;font-size:.85rem;">
         </div>
       </div>
@@ -245,12 +245,12 @@
       <!-- Footer -->
       <div style="padding:.85rem 1.4rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;background:rgba(168,85,247,.04);">
         <div>
-          <div style="font-size:.73rem;color:var(--text-muted);">💡 Für alle Allianzleiter in Hero Scout sichtbar</div>
+          <div style="font-size:.73rem;color:var(--text-muted);">💡 Visible to all alliance leaders in Hero Scout</div>
           <div id="hs_prefill_hint" style="display:none;font-size:.7rem;color:#a78bfa;margin-top:.2rem;"></div>
         </div>
         <div style="display:flex;gap:.5rem;">
-          <button onclick="closeHeroScoutModal()" class="btn btn-secondary" style="font-size:.82rem;">Überspringen</button>
-          <button onclick="saveHeroScout()" id="btnSaveHero" class="btn btn-primary" style="font-size:.82rem;background:linear-gradient(135deg,#7c3aed,#4f46e5);border-color:#7c3aed;">🦸 Hero Scout speichern</button>
+          <button onclick="closeHeroScoutModal()" class="btn btn-secondary" style="font-size:.82rem;">Skip</button>
+          <button onclick="saveHeroScout()" id="btnSaveHero" class="btn btn-primary" style="font-size:.82rem;background:linear-gradient(135deg,#7c3aed,#4f46e5);border-color:#7c3aed;">🦸 Save Hero Scout</button>
         </div>
       </div>
     </div>
@@ -260,11 +260,11 @@
   <div id="playerModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:1001; overflow-y:auto;">
     <div style="max-width:620px; margin:2rem auto; background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.5rem;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-        <h2 id="playerModalTitle" style="margin:0;">Playerprofil</h2>
+        <h2 id="playerModalTitle" style="margin:0;">Player Profile</h2>
         <button onclick="closePlayerModal()" style="background:none; border:none; color:var(--text-muted); font-size:1.4rem; cursor:pointer;">&times;</button>
       </div>
       <div id="playerModalBody">
-        <div style="text-align:center; color:var(--text-muted); padding:2rem;">Lade...</div>
+        <div style="text-align:center; color:var(--text-muted); padding:2rem;">Loading...</div>
       </div>
     </div>
   </div>
@@ -293,7 +293,7 @@
         <button onclick="toggleAnalysisPanel()" style="background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;">&times;</button>
       </div>
       <div id="analysisContent">
-        <div style="text-align:center;color:var(--text-muted);padding:1.5rem;">Lade…</div>
+        <div style="text-align:center;color:var(--text-muted);padding:1.5rem;">Loading…</div>
       </div>
     </div>
   </div>
@@ -317,19 +317,19 @@
 
           <!-- Donut 1: Typ -->
           <div>
-            <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Typ-Verteilung</div>
+            <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Type Distribution</div>
             <div style="position:relative;height:180px;"><canvas id="chartTypeDonut"></canvas></div>
           </div>
 
           <!-- Donut 2: Fake-Score -->
           <div>
-            <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Bedrohungs-Level</div>
+            <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Threat Level</div>
             <div style="position:relative;height:180px;"><canvas id="chartFakeDonut"></canvas></div>
           </div>
 
           <!-- Timeline -->
           <div>
-            <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Ankunfts-Timeline</div>
+            <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Arrival Timeline</div>
             <div style="position:relative;height:180px;"><canvas id="chartTimeline"></canvas></div>
           </div>
 
@@ -343,13 +343,13 @@
 
           <!-- Bedrohung pro Dorf (stacked: real + fake) -->
           <div>
-            <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Bedrohung pro Dorf (Real vs Fake)</div>
+            <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Threat per Village (Real vs Fake)</div>
             <div style="position:relative;height:170px;"><canvas id="chartVillageThreat"></canvas></div>
           </div>
 
           <!-- Korn/h pro Dorf -->
           <div>
-            <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Korn/h Verbrauch pro Dorf</div>
+            <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Crop/h Consumption per Village</div>
             <div style="position:relative;height:170px;"><canvas id="chartCropPerVillage"></canvas></div>
           </div>
 
@@ -360,12 +360,12 @@
       <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:.85rem;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;">
           <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">
-            🛡️ Aktive Def-Calls
+            🛡️ Active Def-Calls
           </div>
-          <button onclick="_loadDefCallsOverview()" style="font-size:.7rem;padding:1px 8px;border-radius:5px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;">↻ Aktualisieren</button>
+          <button onclick="_loadDefCallsOverview()" style="font-size:.7rem;padding:1px 8px;border-radius:5px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;">↻ Refresh</button>
         </div>
         <div id="defCallsOverview" style="display:flex;flex-direction:column;gap:.4rem;">
-          <span style="font-size:.75rem;color:var(--text-muted);">Lädt…</span>
+          <span style="font-size:.75rem;color:var(--text-muted);">Loading…</span>
         </div>
       </div>
 
@@ -376,13 +376,13 @@
           <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">
             👤 Attackers — who is attacking which villages?
           </div>
-          <span id="attackerMapArrow" style="font-size:.7rem;color:var(--text-muted);">▶ anzeigen</span>
+          <span id="attackerMapArrow" style="font-size:.7rem;color:var(--text-muted);">▶ show</span>
         </div>
         <div id="attackerMapBody" style="display:none;margin-top:.75rem;">
           <!-- Tab bar -->
           <div style="display:flex;gap:.3rem;margin-bottom:.6rem;">
             <button onclick="showAttackerTab('map')" id="atk-tab-map"
-              style="font-size:.75rem;padding:.25rem .7rem;border-radius:6px;cursor:pointer;font-weight:600;background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.4);color:#a5b4fc;">🗺️ Karte</button>
+              style="font-size:.75rem;padding:.25rem .7rem;border-radius:6px;cursor:pointer;font-weight:600;background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.4);color:#a5b4fc;">🗺️ Map</button>
             <button onclick="showAttackerTab('flow')" id="atk-tab-flow"
               style="font-size:.75rem;padding:.25rem .7rem;border-radius:6px;cursor:pointer;font-weight:600;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text-muted);">🔀 Fluss</button>
           </div>
@@ -399,7 +399,7 @@
               </div>
               <!-- Legend -->
               <div style="position:absolute;top:.5rem;left:.5rem;background:rgba(10,15,10,.85);border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:.3rem .55rem;font-size:.68rem;display:flex;gap:.6rem;flex-wrap:wrap;">
-                <span>🟥 Angreifer</span><span>🟦 Dein Dorf</span>
+                <span>🟥 Attacker</span><span>🟦 Your Village</span>
                 <span style="color:#f87171;">— real</span><span style="color:#94a3b8;">— fake</span><span style="color:#4ade80;">— support</span>
               </div>
             </div>
@@ -429,7 +429,7 @@
         <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;">
           {% if can_label %}
           <label style="display:flex;align-items:center;gap:.3rem;font-size:.8rem;color:var(--text-muted);cursor:pointer;user-select:none;">
-            <input type="checkbox" id="selectAllCbx" onchange="toggleSelectAll(this.checked)" style="accent-color:#6366f1;"> Alle
+            <input type="checkbox" id="selectAllCbx" onchange="toggleSelectAll(this.checked)" style="accent-color:#6366f1;"> All
           </label>
           {% endif %}
           <!-- Shared type filter -->
@@ -448,11 +448,11 @@
 
       <!-- Shared search/filter bar -->
       <div style="display:flex;flex-wrap:wrap;gap:.4rem;padding:.45rem 1rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.015);">
-        <input id="fAtkName"     type="search" placeholder="🗡️ Angreifer"       oninput="loadOwnAttacks()" style="flex:1;min-width:120px;max-width:170px;font-size:.78rem;padding:.22rem .45rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
-        <input id="fAtkAlliance" type="search" placeholder="🛡 Atk-Allianz"     oninput="loadOwnAttacks()" style="flex:1;min-width:110px;max-width:155px;font-size:.78rem;padding:.22rem .45rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
-        <input id="fAtkVillage"  type="search" placeholder="📍 Atk-Dorf"        oninput="loadOwnAttacks()" style="flex:1;min-width:110px;max-width:155px;font-size:.78rem;padding:.22rem .45rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
-        <input id="fDefAlliance" type="search" placeholder="🏰 Def-Allianz"     oninput="loadOwnAttacks()" style="flex:1;min-width:110px;max-width:155px;font-size:.78rem;padding:.22rem .45rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
-        <input id="fDefVillage"  type="search" placeholder="🏘️ Def-Dorf"        oninput="loadOwnAttacks()" style="flex:1;min-width:110px;max-width:155px;font-size:.78rem;padding:.22rem .45rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+        <input id="fAtkName"     type="search" placeholder="🗡️ Attacker"        oninput="loadOwnAttacks()" style="flex:1;min-width:120px;max-width:170px;font-size:.78rem;padding:.22rem .45rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+        <input id="fAtkAlliance" type="search" placeholder="🛡 Atk Alliance"    oninput="loadOwnAttacks()" style="flex:1;min-width:110px;max-width:155px;font-size:.78rem;padding:.22rem .45rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+        <input id="fAtkVillage"  type="search" placeholder="📍 Atk Village"     oninput="loadOwnAttacks()" style="flex:1;min-width:110px;max-width:155px;font-size:.78rem;padding:.22rem .45rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+        <input id="fDefAlliance" type="search" placeholder="🏰 Def Alliance"    oninput="loadOwnAttacks()" style="flex:1;min-width:110px;max-width:155px;font-size:.78rem;padding:.22rem .45rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+        <input id="fDefVillage"  type="search" placeholder="🏘️ Def Village"     oninput="loadOwnAttacks()" style="flex:1;min-width:110px;max-width:155px;font-size:.78rem;padding:.22rem .45rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
         <button onclick="clearAdvFilters()" style="font-size:.75rem;padding:.2rem .55rem;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:6px;color:var(--text-muted);cursor:pointer;">✕ Clear</button>
       </div>
 
@@ -482,7 +482,7 @@
         <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
           <span style="font-size:.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;flex-shrink:0;">Players</span>
           <div id="playerFilterChips" style="display:flex;flex-wrap:wrap;gap:.3rem;flex:1;"></div>
-          <button id="playerFilterClearBtn" onclick="clearPlayerFilter()" style="display:none;font-size:.7rem;padding:1px 8px;border-radius:5px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#f87171;cursor:pointer;">✕ Alle</button>
+          <button id="playerFilterClearBtn" onclick="clearPlayerFilter()" style="display:none;font-size:.7rem;padding:1px 8px;border-radius:5px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#f87171;cursor:pointer;">✕ All</button>
         </div>
       </div>
     </div>
@@ -532,7 +532,7 @@
   <!-- ===== BOT-DETECTED ATTACKS (Discord alarm flow) ===== -->
   <div class="card" style="margin-top:1.5rem;">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem;">
-      <h2 style="margin:0;font-size:1rem;">&#x1F916; Discord-Alarm — automatisch erkannte Meldungen</h2>
+      <h2 style="margin:0;font-size:1rem;">&#x1F916; Discord Alarm — Auto-Detected Reports</h2>
       <span style="font-size:.74rem;color:var(--text-muted);">Parsed from the alarm channel · supplements the rally point import above</span>
     </div>
     <div style="display:flex;flex-direction:column;gap:.4rem;">
@@ -541,7 +541,7 @@
                   padding:.4rem .65rem;background:var(--bg-main);border:1px solid var(--border);border-radius:6px;">
         <div style="font-size:.82rem;">
           <strong>{{ r.attack_count }}</strong> attack(s)
-          <span style="color:var(--text-muted);">· gemeldet von {{ r.reporter_name or '—' }}{% if r.created_at %} · {{ r.created_at[:16].replace('T',' ') }} UTC{% endif %}</span>
+          <span style="color:var(--text-muted);">· reported by {{ r.reporter_name or '—' }}{% if r.created_at %} · {{ r.created_at[:16].replace('T',' ') }} UTC{% endif %}</span>
         </div>
         <a href="/guild/{{ guild.guild_id }}/attacks/{{ r.id }}/analyse"
            class="btn btn-secondary" style="font-size:.78rem;padding:.2rem .6rem;flex-shrink:0;">&#x1F52C; Analysis</a>
@@ -554,14 +554,14 @@
   <!-- ===== CONFIG SECTION (collapsed) ===== -->
   <details style="margin-top:1.5rem;">
     <summary style="cursor:pointer; font-size:0.9rem; color:var(--text-muted); padding:0.5rem 0;">
-      &#x2699;&#xFE0F; Discord Alarm-Konfiguration
+      &#x2699;&#xFE0F; Discord Alarm Configuration
     </summary>
     <div class="grid-2" style="margin-top:1rem;">
       <div class="card">
-        <h2>Konfiguration</h2>
+        <h2>Configuration</h2>
         <form method="post" action="/guild/{{ guild.guild_id }}/attacks/config">
           <div class="form-group">
-            <label for="attack_channel_id">Alarm-Kanal ID</label>
+            <label for="attack_channel_id">Alarm Channel ID</label>
             <p class="field-hint">Channel for incoming <strong>attack alerts</strong> — not the battle report channel (Enemies page).</p>
             <input type="text" id="attack_channel_id" name="attack_channel_id"
               value="{{ guild.attack_channel_id or '' }}"
@@ -587,23 +587,23 @@
         <h2>Status</h2>
         <ul class="status-list">
           <li>
-            <span class="status-label">Alarm-Kanal</span>
+            <span class="status-label">Alarm Channel</span>
             {% if guild.attack_channel_id %}
             <span class="badge badge-ok">&#x2705; {{ guild.attack_channel_id }}</span>
             {% else %}
-            <span class="badge badge-warn">&#x26A0;&#xFE0F; Nicht konfiguriert</span>
+            <span class="badge badge-warn">&#x26A0;&#xFE0F; Not configured</span>
             {% endif %}
           </li>
           <li>
-            <span class="status-label">Melde-Button</span>
+            <span class="status-label">Report Button</span>
             {% if guild.attack_button_message_id %}
-            <span class="badge badge-ok">&#x2705; Aktiv</span>
+            <span class="badge badge-ok">&#x2705; Active</span>
             {% else %}
-            <span class="badge badge-warn">&#x26A0;&#xFE0F; Kein Button</span>
+            <span class="badge badge-warn">&#x26A0;&#xFE0F; No button</span>
             {% endif %}
           </li>
           <li>
-            <span class="status-label">Gesamt-Meldungen (Discord)</span>
+            <span class="status-label">Total Reports (Discord)</span>
             <span class="badge">{{ attack_stats.total_reports }}</span>
           </li>
         </ul>
@@ -1114,7 +1114,7 @@
         <span style="color:var(--text-muted);">→</span>
         <span>${escHtml(a.own_village_name)}</span>
         <span style="color:var(--text-muted); font-size:0.8rem;">${fmtArrival(a.arrival_time)}</span>
-        <span style="margin-left:auto;">${a.troops_hidden ? '<span style="color:#fbbf24; font-size:0.8rem;">? Truppen</span>' : '<span style="font-size:0.8rem;">'+a.troop_count+' Einh.</span>'}</span>
+        <span style="margin-left:auto;">${a.troops_hidden ? '<span style="color:#fbbf24; font-size:0.8rem;">? troops</span>' : '<span style="font-size:0.8rem;">'+a.troop_count+' units</span>'}</span>
         ${fakeBadge(a.fake_score)}
       </div>
     `).join('');
@@ -1317,7 +1317,7 @@
         <div class="hs-slot-lbl">${s.label.replace(/^[^ ]+ /, '')}</div>
         <div class="hs-slot-item" id="hsSlotItem_${s.key}">—</div>
         <select class="hs-slot-sel" id="hs_slot_${s.key}" onchange="hsUpdateSlot('${s.key}',this.value)">
-          <option value="">— leer —</option>
+          <option value="">— empty —</option>
           ${opts}
         </select>
       </div>`;
@@ -1368,7 +1368,7 @@
     const ind = document.getElementById('hs_queue_indicator');
     if (ind) {
       if (total > 1) {
-        ind.textContent = `${current} / ${total} Angreifer`;
+        ind.textContent = `${current} / ${total} attackers`;
         ind.style.display = 'block';
       } else {
         ind.style.display = 'none';
@@ -1474,7 +1474,7 @@
       showToast('❌ Fehler: ' + e.message);
     } finally {
       btn.disabled = false;
-      btn.textContent = '🦸 Hero Scout speichern';
+      btn.textContent = '🦸 Save Hero Scout';
     }
   };
 
@@ -1791,20 +1791,20 @@
     if (hasRealGap) {
       let zwText = '';
       if (gapSec < 60) {
-        zwText = `<strong>${gapLabel}</strong> Fenster — sehr eng. Nur Schnelleinheiten (Paladin, Ritter, EI) haben Chance.`;
+        zwText = `<strong>${gapLabel}</strong> window — very tight. Only fast units (Paladin, Knight, EI) have a chance.`;
       } else if (gapSec < 300) {
-        zwText = `<strong>${gapLabel}</strong> Fenster — Kavallerie als Zwischendeff schicken, sobald Welle ${waveIdx} aufschlägt.`;
+        zwText = `<strong>${gapLabel}</strong> window — send cavalry as interception def once wave ${waveIdx} hits.`;
       } else if (gapSec < 1800) {
-        zwText = `<strong>${gapLabel}</strong> Fenster — Kavallerie oder Infanterie rechtzeitig schickbar. Zwischendeff gut möglich.`;
+        zwText = `<strong>${gapLabel}</strong> window — cavalry or infantry can arrive in time. Good interception def opportunity.`;
       } else {
-        zwText = `<strong>${gapLabel}</strong> Fenster — große Lücke. Vollständige Verstärkung möglich, auch Infanterie kommt an.`;
+        zwText = `<strong>${gapLabel}</strong> window — large gap. Full reinforcement possible, infantry will arrive in time.`;
       }
       return `<div style="margin:.3rem 0;padding:.5rem .85rem;border-radius:7px;
         background:rgba(34,197,94,.08);border-left:3px solid #22c55e;border:1px solid rgba(34,197,94,.25);
         display:flex;align-items:flex-start;gap:.55rem;">
         <span style="font-size:1rem;line-height:1.4;flex-shrink:0;">🟢</span>
         <div style="font-size:.78rem;line-height:1.5;">
-          <span style="color:#86efac;font-weight:800;">Zwischendeff-Fenster</span>
+          <span style="color:#86efac;font-weight:800;">Interception Def Window</span>
           <span style="color:var(--text-muted);margin:0 .3rem;">·</span>
           <span style="color:var(--text-muted);">${arr1} → ${arr2}</span><br>
           <span style="color:#bbf7d0;">${zwText}</span>
@@ -1815,7 +1815,7 @@
     // Small neutral gap — just a divider label
     return `<div style="display:flex;align-items:center;gap:.5rem;margin:.2rem 0;opacity:.55;">
       <div style="flex:1;height:1px;background:var(--border);"></div>
-      <span style="font-size:.68rem;color:var(--text-muted);white-space:nowrap;">⏱ ${gapLabel} Abstand</span>
+      <span style="font-size:.68rem;color:var(--text-muted);white-space:nowrap;">⏱ ${gapLabel} gap</span>
       <div style="flex:1;height:1px;background:var(--border);"></div>
     </div>`;
   }
@@ -1842,14 +1842,17 @@
     }
 
     const groups = buildGroups(attacks);
+    const groupKeys = Object.keys(groups);
+    const autoCollapse = groupKeys.length > 10 || attacks.length > 100;
     let html = '';
-    for (const key of Object.keys(groups)) {
+    for (const key of groupKeys) {
       const g = groups[key];
       const safeKey = key.replace(/[^a-zA-Z0-9_-]/g, '_');
       const coords = g.x != null ? ' ('+g.x+'|'+g.y+')' : '';
       const waves = groupIntoWaves(g.attacks);
       const realCount = g.attacks.filter(a => a.attack_type !== 'support' && (a.fake_score||50) < 60).length;
       const supportCount = g.attacks.filter(a => a.attack_type === 'support').length;
+      if (autoCollapse && !(safeKey in _villageCollapsed)) _villageCollapsed[safeKey] = true;
       const isCollapsed = !!_villageCollapsed[safeKey];
       const threatColor = realCount > 0 ? '#ef4444' : supportCount > 0 ? '#22c55e' : '#6366f1';
 
@@ -1935,9 +1938,9 @@
 
     return `<div style="width:100%;padding:.25rem .3rem .05rem 1.2rem;display:flex;align-items:center;flex-wrap:wrap;gap:.3rem;">
       <span style="font-size:.67rem;color:var(--text-muted);flex-shrink:0;">
-        📐 ${distFmt} Felder · ⏳ noch ${remainFmt} →
+        📐 ${distFmt} fields · ⏳ ${remainFmt} left →
         <strong style="color:${slowest.color};">${slowest.icon} ${slowest.name}${slowestTp}</strong>
-        könnte langsamste Einheit sein
+        could be slowest unit
       </span>
       <span style="display:flex;gap:.2rem;flex-wrap:wrap;">${chips}</span>
     </div>`;
@@ -2184,7 +2187,7 @@
             <span style="font-size:.72rem;font-weight:700;color:#a5b4fc;">🛡️ Def-Call aktiv</span>
             ${statusBadge}
             ${progressBar}
-            <span style="font-size:.7rem;color:var(--text-muted);margin-left:auto;">${d.contributors} Verteidiger</span>
+            <span style="font-size:.7rem;color:var(--text-muted);margin-left:auto;">${d.contributors} defenders</span>
           </div>
           ${contribList}
         </div>`;
@@ -3694,7 +3697,7 @@ function renderAttackCharts(attacks, groups) {
 
         <!-- Notes -->
         <div>
-          <label style="font-size:.75rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:.3rem;">📝 Notizen für Verteidiger</label>
+          <label style="font-size:.75rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:.3rem;">📝 Notes for Defenders</label>
           <textarea id="dcm_notes" rows="2" placeholder="z.B. Held schicken, Chief-Zug möglich, priorität hoch…"
             style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:.42rem .65rem;font-size:.88rem;resize:vertical;"></textarea>
         </div>
@@ -3702,7 +3705,7 @@ function renderAttackCharts(attacks, groups) {
         <!-- Info box -->
         <div style="font-size:.73rem;color:var(--text-muted);background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.18);border-radius:7px;padding:.55rem .8rem;line-height:1.6;">
           📤 Ein Discord-Kanal wird erstellt und die Defend-Rolle gepingt.<br>
-          Verteidiger posten ihren <strong style="color:var(--text);">Truppenplatz → Unterstützung</strong> + optional <strong style="color:var(--text);">Marktplatz</strong> — das System berechnet wer rechtzeitig ankommt.
+          Defenders post their <strong style="color:var(--text);">Rally Point → Reinforcements</strong> + optional <strong style="color:var(--text);">Marketplace</strong> — the system calculates who can arrive in time.
         </div>
 
         <div id="dcm_error" style="display:none;color:#f87171;font-size:.8rem;padding:.35rem .65rem;background:rgba(248,113,113,.08);border-radius:6px;border:1px solid rgba(248,113,113,.2);"></div>
