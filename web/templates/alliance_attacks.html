@@ -56,9 +56,9 @@
   <!-- Attack Map -->
   <div style="margin-bottom:.75rem;">
     <div class="card" style="padding:0;overflow:hidden;">
-      <div onclick="toggleAllyMap()" style="display:flex;align-items:center;justify-content:space-between;padding:.4rem .75rem;cursor:pointer;user-select:none;border-bottom:1px solid var(--border);">
-        <span style="font-size:.78rem;font-weight:700;">🗺️ Attack Map</span>
-        <span id="allyMapArrow" style="font-size:.65rem;color:var(--text-muted);">▶ show</span>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:.4rem .75rem;border-bottom:1px solid var(--border);">
+        <span onclick="toggleAllyMap()" style="font-size:.78rem;font-weight:700;cursor:pointer;flex:1;">🗺️ Attack Map <span id="allyMapArrow" style="font-size:.65rem;color:var(--text-muted);">▶ show</span></span>
+        <button onclick="shareAllyMap(this)" style="font-size:.6rem;padding:.1rem .35rem;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:4px;color:#a5b4fc;cursor:pointer;" title="Create anonymous public link">🔗 Share</button>
       </div>
       <div id="allyMapBody" style="display:none;">
         <div style="display:flex;flex-wrap:wrap;gap:0;border-bottom:1px solid var(--border);">
@@ -558,6 +558,25 @@ function _amRender() {
 // Map controls
 window._amZoom = function(f) { _am.scale*=f; _amRender(); };
 window._amReset = function() { _am.scale=0; _am.offX=0; _am.offY=0; _amRender(); };
+
+window.shareAllyMap = async function(btn) {
+  btn.disabled=true; btn.textContent='⏳';
+  try {
+    const r = await fetch(`/guild/${GUILD_ID}/attacks/api/alliance/share`, {method:'POST'});
+    const d = await r.json();
+    if (r.ok && d.url) {
+      navigator.clipboard.writeText(d.url).then(()=>{
+        btn.textContent='✅ Copied'; btn.style.color='#4ade80';
+      }).catch(()=>{
+        prompt('Copy this link:', d.url);
+        btn.textContent='🔗 Share'; btn.disabled=false;
+      });
+    } else {
+      alert('Error: '+(d.error||r.status));
+      btn.textContent='🔗 Share'; btn.disabled=false;
+    }
+  } catch(e) { alert('Network error'); btn.textContent='🔗 Share'; btn.disabled=false; }
+};
 
 (function(){
   const c=document.getElementById('allyMapCanvas');if(!c)return;

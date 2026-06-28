@@ -4217,6 +4217,22 @@ async def get_artifact_interests(guild_id: str, artifact_id: int = None) -> list
             return [dict(r) for r in await cur.fetchall()]
 
 
+async def create_attack_map_share(guild_id: str, attacks_json: str) -> str:
+    import secrets
+    token = secrets.token_urlsafe(12)
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute(
+            "INSERT INTO admin_settings (key, value) VALUES (?, ?)",
+            (f"atk_share:{token}", attacks_json),
+        )
+        await db.commit()
+    return token
+
+
+async def get_attack_map_share(token: str) -> str | None:
+    return await get_setting(f"atk_share:{token}")
+
+
 async def get_setting(key: str) -> str | None:
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
         async with db.execute(

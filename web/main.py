@@ -6598,6 +6598,47 @@ async def attacks_api_member_status(request: Request, guild_id: str):
     return JSONResponse(status)
 
 
+@app.post("/guild/{guild_id}/attacks/api/alliance/share")
+async def attacks_alliance_share(request: Request, guild_id: str):
+    session, err = await _attack_access(request, guild_id)
+    if err: return err
+    attacks = await database.get_incoming_attacks_alliance(guild_id)
+    needs_resolve = [a for a in attacks if a.get("own_village_x") is None and a.get("own_village_name")]
+    if needs_resolve:
+        resolved = {}
+        for a in needs_resolve:
+            vname = a["own_village_name"]
+            if vname not in resolved:
+                resolved[vname] = await database.resolve_village_coords(guild_id, vname)
+            coords = resolved[vname]
+            if coords:
+                a["own_village_x"] = coords["x"]
+                a["own_village_y"] = coords["y"]
+    import json as _json
+    stripped = []
+    for a in attacks:
+        stripped.append({
+            "ax": a.get("attacker_x"), "ay": a.get("attacker_y"),
+            "ap": a.get("attacker_player", ""),
+            "dx": a.get("own_village_x"), "dy": a.get("own_village_y"),
+            "dn": a.get("own_village_name", ""),
+            "fs": a.get("fake_score", 50),
+            "at": a.get("arrival_time", ""),
+            "tp": a.get("attack_type", "attack"),
+        })
+    token = await database.create_attack_map_share(guild_id, _json.dumps(stripped))
+    base = str(request.base_url).rstrip("/")
+    return JSONResponse({"url": f"{base}/shared/attack-map/{token}"})
+
+
+@app.get("/shared/attack-map/{token}", response_class=HTMLResponse)
+async def shared_attack_map(request: Request, token: str):
+    raw = await database.get_attack_map_share(token)
+    if not raw:
+        return HTMLResponse("<h1>Link expired or invalid</h1>", status_code=404)
+    return templates.TemplateResponse("shared_attack_map.html", {"request": request, "attacks_json": raw})
+
+
 @app.get("/guild/{guild_id}/attacks/alliance-overview", response_class=HTMLResponse)
 async def attacks_alliance_overview(request: Request, guild_id: str):
     session, err = _require_session(request)
