@@ -12367,7 +12367,7 @@ async def api_sidebar_style(request: Request):
             return JSONResponse(_json_mod.loads(raw))
         except Exception:
             pass
-    return JSONResponse({"font_family": "", "font_size": ""})
+    return JSONResponse({"font_family": "", "font_size": "", "font_color": ""})
 
 
 @app.post("/admin/sidebar/style")
@@ -12379,9 +12379,11 @@ async def admin_sidebar_style_save(request: Request):
     body = await request.json()
     font_family = str(body.get("font_family", "")).strip()
     font_size   = str(body.get("font_size", "")).strip()
+    font_color  = str(body.get("font_color", "")).strip()
     await database.set_setting("sidebar_style_config", _json_mod.dumps({
         "font_family": font_family,
         "font_size": font_size,
+        "font_color": font_color,
     }))
     return JSONResponse({"ok": True})
 

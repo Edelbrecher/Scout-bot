@@ -727,16 +727,24 @@ function escHtml(s) {
         +lockHtml
         +'</a>';
     }
-    var html = '<div style="display:flex;align-items:center;">'
-      + '<a class="gs-item' + (path==='/guild/'+gid||path==='/guild/'+gid+'/'?' active':'') + '" href="/guild/'+gid+'" data-label="Overview" style="flex:1;">'
-      + ico('home') + '<span class="gs-label">Overview</span></a>'
-      + '<button class="gs-toggle-btn" id="gs-collapse-btn" onclick="gsSidebarToggle()" title="Collapse" style="flex-shrink:0;margin-right:.3rem;">◀</button>'
-      + '</div>';
-    var skipFirst = true;
+    var html = '';
+    var collapseDone = false;
     navData.forEach(function(item){
-      if (skipFirst && !item.type && item.icon === 'home' && (item.url_suffix === '' || !item.url_suffix)) { skipFirst = false; return; }
+      if (!collapseDone && !item.type && (item.url_suffix === '' || !item.url_suffix)) {
+        var isHome = path==='/guild/'+gid||path==='/guild/'+gid+'/';
+        html += '<div style="display:flex;align-items:center;">'
+          + '<a class="gs-item'+(isHome?' active':'')+'" href="/guild/'+gid+'" data-label="'+(item.label||'Overview')+'" style="flex:1;">'
+          + ico(item.icon||'home') + '<span class="gs-label">'+(item.label||'Overview')+'</span></a>'
+          + '<button class="gs-toggle-btn" id="gs-collapse-btn" onclick="gsSidebarToggle()" title="Collapse" style="flex-shrink:0;margin-right:.3rem;">◀</button>'
+          + '</div>';
+        collapseDone = true;
+        return;
+      }
       html += buildItem(item, gid, path, false);
     });
+    if (!collapseDone) {
+      html = '<div style="display:flex;align-items:center;"><button class="gs-toggle-btn" id="gs-collapse-btn" onclick="gsSidebarToggle()" title="Collapse" style="margin:.3rem;">◀</button></div>' + html;
+    }
     document.getElementById('gs-nav-items').innerHTML = html;
 
     // Re-apply active search filter if the user had typed something
@@ -974,6 +982,8 @@ function escHtml(s) {
     else               sb.style.removeProperty('--gs-font-size');
     if (s.font_family) sb.style.setProperty('--gs-font-family', s.font_family);
     else               sb.style.removeProperty('--gs-font-family');
+    if (s.font_color)  sb.style.setProperty('--gs-font-color',  s.font_color);
+    else               sb.style.removeProperty('--gs-font-color');
   }
 
   function gsSidebarToggle() {
@@ -982,8 +992,14 @@ function escHtml(s) {
     body.classList.toggle('sidebar-collapsed');
     var collapsed = body.classList.contains('sidebar-collapsed');
     localStorage.setItem('gs_collapsed', collapsed ? '1' : '0');
-    btn.textContent = collapsed ? '▶' : '◀';
+    if (btn) btn.textContent = collapsed ? '▶' : '◀';
   }
+  // Click anywhere on collapsed sidebar to expand
+  document.getElementById('guild-sidebar').addEventListener('click', function(e) {
+    if (document.body.classList.contains('sidebar-collapsed') && !e.target.closest('a')) {
+      gsSidebarToggle();
+    }
+  });
 
   function gsMobileToggle() {
     document.body.classList.toggle('mobile-sidebar-open');

@@ -61,15 +61,28 @@
             <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Font Size</label>
             <select id="styleFontSize" style="background:var(--bg-input);border:1px solid var(--border);border-radius:7px;padding:.4rem .65rem;color:var(--text);font-size:.85rem;">
               <option value="">— Default (0.8rem) —</option>
-              <option value="0.7rem">0.7 rem (very small)</option>
+              <option value="0.6rem">0.6 rem (tiny)</option>
+              <option value="0.65rem">0.65 rem</option>
+              <option value="0.7rem">0.7 rem</option>
               <option value="0.75rem">0.75 rem</option>
               <option value="0.8rem">0.8 rem</option>
               <option value="0.85rem">0.85 rem</option>
-              <option value="0.875rem">0.875 rem</option>
               <option value="0.9rem">0.9 rem</option>
               <option value="0.95rem">0.95 rem</option>
               <option value="1rem">1 rem (large)</option>
             </select>
+          </div>
+          <div>
+            <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">Font Color</label>
+            <div style="display:flex;gap:.4rem;align-items:center;">
+              <input type="color" id="styleFontColor" value="#6b7280"
+                style="width:36px;height:30px;border:1px solid var(--border);border-radius:6px;background:var(--bg-input);cursor:pointer;padding:2px;">
+              <input type="text" id="styleFontColorText" value="" placeholder="#6b7280"
+                style="width:90px;background:var(--bg-input);border:1px solid var(--border);border-radius:7px;padding:.35rem .5rem;color:var(--text);font-size:.8rem;font-family:monospace;"
+                oninput="document.getElementById('styleFontColor').value=this.value">
+              <button onclick="document.getElementById('styleFontColor').value='#6b7280';document.getElementById('styleFontColorText').value='';"
+                style="font-size:.7rem;padding:.2rem .4rem;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:5px;color:var(--text-muted);cursor:pointer;">Reset</button>
+            </div>
           </div>
           <div>
             <button onclick="saveStyle()" class="btn btn-primary" style="font-size:.85rem;">💾 Save</button>
@@ -867,16 +880,21 @@ render();
         if (sel.options[i].value === s.font_size) { sel.selectedIndex = i; break; }
       }
     }
+    if (s.font_color) {
+      document.getElementById('styleFontColor').value = s.font_color;
+      document.getElementById('styleFontColorText').value = s.font_color;
+    }
   } catch(e) {}
 })();
 
 async function saveStyle() {
   const font_family = document.getElementById('styleFontFamily').value;
   const font_size   = document.getElementById('styleFontSize').value;
+  const font_color  = document.getElementById('styleFontColorText').value.trim() || document.getElementById('styleFontColor').value;
   const r = await fetch('/admin/sidebar/style', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ font_family, font_size })
+    body: JSON.stringify({ font_family, font_size, font_color: font_color === '#6b7280' ? '' : font_color })
   });
   if (r.ok) {
     // Invalidate style cache so next page load picks up new values
