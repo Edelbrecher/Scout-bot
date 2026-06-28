@@ -1313,15 +1313,15 @@
       <!-- Summary Cards -->
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-bottom:1px solid var(--border);">
         <div style="padding:1rem;text-align:center;border-right:1px solid var(--border);">
-          <div style="font-size:1.5rem;font-weight:800;color:#22c55e;">+{{ growth_data | selectattr('delta','gt',0) | sum(attribute='delta') | int | abs }}</div>
+          <div style="font-size:1rem;font-weight:800;color:#22c55e;">+{{ growth_data | selectattr('delta','gt',0) | sum(attribute='delta') | int | abs }}</div>
           <div style="font-size:0.75rem;color:var(--text-muted);">Population grown</div>
         </div>
         <div style="padding:1rem;text-align:center;border-right:1px solid var(--border);">
-          <div style="font-size:1.5rem;font-weight:800;color:#ef4444;">{{ growth_data | selectattr('delta','lt',0) | sum(attribute='delta') | int }}</div>
+          <div style="font-size:1rem;font-weight:800;color:#ef4444;">{{ growth_data | selectattr('delta','lt',0) | sum(attribute='delta') | int }}</div>
           <div style="font-size:0.75rem;color:var(--text-muted);">Population shrunk</div>
         </div>
         <div style="padding:1rem;text-align:center;">
-          <div style="font-size:1.5rem;font-weight:800;">{{ growth_data | length }}</div>
+          <div style="font-size:1rem;font-weight:800;">{{ growth_data | length }}</div>
           <div style="font-size:0.75rem;color:var(--text-muted);">Players tracked</div>
         </div>
       </div>

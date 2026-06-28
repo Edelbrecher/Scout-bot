@@ -5,16 +5,16 @@
 {% from "_combat_flow.html" import combat_flow %}
 <div class="container">
 
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.4rem;margin-bottom:.5rem;">
     <div>
-      <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:.2rem 0 .1rem;font-size:1.5rem;" data-i18n="enemies.title">🎯 Enemy Records</h1>
-      <p class="subtitle" style="margin:0;" data-i18n="enemies.subtitle">
-        Automatically populated when scout reports arrive in Discord
+      <a href="/guild/{{ guild.guild_id }}" class="back-link" style="font-size:.72rem;">← {{ guild.guild_name }}</a>
+      <h1 style="margin:.1rem 0 0;font-size:1rem;" data-i18n="enemies.title">🎯 Enemy Records</h1>
+      <p class="subtitle" style="margin:0;font-size:.68rem;" data-i18n="enemies.subtitle">
+        Auto-populated from Discord scout reports
       </p>
     </div>
-    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
-      <a href="/guild/{{ guild.guild_id }}/alliance-tracking" class="btn btn-secondary" style="font-size:.85rem;">
+    <div style="display:flex;gap:.25rem;flex-wrap:wrap;align-items:center;">
+      <a href="/guild/{{ guild.guild_id }}/alliance-tracking" class="btn btn-secondary" style="font-size:.68rem;padding:.2rem .45rem;">
         🔭 Alliance Tracking
       </a>
       {% if top_alliances %}
@@ -29,9 +29,8 @@
       </div>
       {% endif %}
       <button onclick="document.getElementById('add-enemy-panel').style.display='block';this.style.display='none';document.getElementById('aps-input').focus();"
-              id="add-enemy-btn"
-              style="padding:.4rem .9rem;border-radius:6px;background:rgba(99,102,241,.15);
-                     border:1px solid rgba(99,102,241,.35);color:#818cf8;font-size:.85rem;font-weight:600;cursor:pointer;">
+              id="add-enemy-btn" class="btn btn-secondary"
+              style="font-size:.68rem;padding:.2rem .45rem;border-color:rgba(99,102,241,.35);color:#818cf8;">
         ➕ Add enemy
       </button>
     </div>

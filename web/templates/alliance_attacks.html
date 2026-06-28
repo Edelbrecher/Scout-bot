@@ -1,21 +1,21 @@
 {% extends "base.html" %}
-{% block title %}Allianz-Angriffe · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Alliance Attacks · {{ guild.guild_name }} · TravOps{% endblock %}
 
 {% block content %}
 {% from "_combat_flow.html" import combat_flow %}
 <div class="container" style="padding-bottom:3rem;">
-  <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
+  <a href="/guild/{{ guild.guild_id }}" class="back-link" style="font-size:.72rem;">← {{ guild.guild_name }}</a>
 
   <!-- Header -->
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.25rem;">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem;margin-bottom:.5rem;">
     <div>
-      <h1 style="margin:.2rem 0 .1rem;font-size:1.5rem;">🚨 Allianz-Angriffe</h1>
-      <p class="subtitle" style="margin:0;">Alle eingehenden Angriffe der Allianz auf einen Blick — koordinierte Wellen erkennen</p>
+      <h1 style="margin:.1rem 0 0;font-size:1rem;">🚨 Alliance Attacks</h1>
+      <p class="subtitle" style="margin:0;font-size:.68rem;">All incoming attacks at a glance — detect coordinated waves</p>
     </div>
-    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-      <span id="lastRefresh" style="font-size:.75rem;color:var(--text-muted);"></span>
-      <button onclick="refresh()" class="btn btn-secondary" style="font-size:.83rem;">🔄 Aktualisieren</button>
-      <a href="/guild/{{ guild.guild_id }}/attacks" class="btn btn-secondary" style="font-size:.83rem;">📋 Eigene Angriffe</a>
+    <div style="display:flex;gap:.25rem;align-items:center;flex-wrap:wrap;">
+      <span id="lastRefresh" style="font-size:.65rem;color:var(--text-muted);"></span>
+      <button onclick="refresh()" class="btn btn-secondary" style="font-size:.68rem;padding:.2rem .45rem;">🔄 Refresh</button>
+      <a href="/guild/{{ guild.guild_id }}/attacks" class="btn btn-secondary" style="font-size:.68rem;padding:.2rem .45rem;">📋 Own Attacks</a>
     </div>
   </div>
 

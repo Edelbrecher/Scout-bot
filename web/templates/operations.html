@@ -1007,7 +1007,7 @@ const TW_WORLD = {{ (guild.tw_world or '') | tojson }};
       <div class="pb-right">
         <div id="pbAssignPanel">
           <div class="pb-right-empty">
-            <span style="font-size:1.5rem;">🎯</span>
+            <span style="font-size:1rem;">🎯</span>
             <span>Click a village<br>to see your players<br>with march times</span>
           </div>
         </div>
@@ -1793,7 +1793,7 @@ async function addVillageFromBrowser(x, y, player, village, pop, el) {
         // Clear assignment panel if this was the open target
         if (assignTarget?.x === x && assignTarget?.y === y) {
           document.getElementById('pbAssignPanel').innerHTML = `<div class="pb-right-empty">
-            <span style="font-size:1.5rem;">🎯</span>
+            <span style="font-size:1rem;">🎯</span>
             <span>Click a village<br>to see your players<br>with march times</span>
           </div>`;
           assignTarget = null;

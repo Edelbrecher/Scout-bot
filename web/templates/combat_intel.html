@@ -8,15 +8,15 @@
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;">
     <div>
       <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:.2rem 0 .1rem;font-size:1.5rem;">🧠 Combat Intel</h1>
+      <h1 style="margin:.2rem 0 .1rem;font-size:1rem;">🧠 Combat Intel</h1>
       <p class="subtitle" style="margin:0;">Spieler-Profile aus Kampfberichten · Schaden, Verluste &amp; Bauzeit-Analyse</p>
     </div>
     <form method="get" action="/guild/{{ guild.guild_id }}/reports/intel"
           style="display:flex;gap:.5rem;">
       <input type="text" name="q" value="{{ q }}" placeholder="Jump to player…"
              style="width:220px;background:var(--bg-input);border:1px solid var(--border);
-                    border-radius:8px;color:var(--text);font-size:.85rem;padding:.42rem .75rem;">
-      <button type="submit" class="btn btn-primary" style="font-size:.85rem;">View profile</button>
+                    border-radius:8px;color:var(--text);font-size:.68rem;padding:.42rem .75rem;">
+      <button type="submit" class="btn btn-primary" style="font-size:.68rem;">View profile</button>
     </form>
   </div>
 

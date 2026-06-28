@@ -19,22 +19,22 @@
   ('intel',    '🧠',  'Combat Intel',     '/guild/' ~ guild_id ~ '/reports/intel'),
   ('enemies',  '☠️',  'Enemies',          '/guild/' ~ guild_id ~ '/enemies')
 ] %}
-<div title="Kampf- & Verteidigungs-Workflow"
-     style="display:flex;align-items:center;gap:.15rem;flex-wrap:wrap;margin-bottom:1.1rem;
-            font-size:.78rem;background:var(--bg-card);border:1px solid var(--border);
-            border-radius:8px;padding:.4rem .55rem;overflow-x:auto;">
+<div title="Combat & Defense Workflow"
+     style="display:flex;align-items:center;gap:.1rem;flex-wrap:wrap;margin-bottom:.6rem;
+            font-size:.68rem;background:var(--bg-card);border:1px solid var(--border);
+            border-radius:6px;padding:.25rem .4rem;overflow-x:auto;">
   {% for key, icon, label, url in steps %}
     {% if key == active %}
-    <span style="display:inline-flex;align-items:center;gap:.3rem;padding:.22rem .6rem;border-radius:6px;
+    <span style="display:inline-flex;align-items:center;gap:.2rem;padding:.15rem .45rem;border-radius:5px;
                  background:var(--primary);color:#fff;font-weight:700;white-space:nowrap;">{{ icon }} {{ label }}</span>
     {% else %}
     <a href="{{ url }}" data-tab-nav="1"
-       style="display:inline-flex;align-items:center;gap:.3rem;padding:.22rem .6rem;border-radius:6px;
+       style="display:inline-flex;align-items:center;gap:.2rem;padding:.15rem .45rem;border-radius:5px;
               color:var(--text-muted);text-decoration:none;white-space:nowrap;transition:background .15s,color .15s;"
        onmouseover="this.style.background='var(--bg-main)';this.style.color='var(--text)';"
        onmouseout="this.style.background='';this.style.color='var(--text-muted)';">{{ icon }} {{ label }}</a>
     {% endif %}
-    {% if not loop.last %}<span style="color:var(--border);user-select:none;">›</span>{% endif %}
+    {% if not loop.last %}<span style="color:var(--border);user-select:none;font-size:.6rem;">›</span>{% endif %}
   {% endfor %}
 </div>
 {% endmacro %}

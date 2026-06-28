@@ -217,19 +217,19 @@
       <!-- KPI strip -->
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.65rem;margin-bottom:1rem;">
         <div class="card" style="padding:0.75rem 0.9rem;text-align:center;">
-          <div style="font-size:1.5rem;font-weight:800;">{{ members|length }}</div>
+          <div style="font-size:1rem;font-weight:800;">{{ members|length }}</div>
           <div style="font-size:0.75rem;color:var(--text-muted);">👥 Members</div>
         </div>
         <div class="card" style="padding:0.75rem 0.9rem;text-align:center;">
-          <div style="font-size:1.5rem;font-weight:800;color:#f59e0b;">{{ members | sum(attribute='villages') | int }}</div>
+          <div style="font-size:1rem;font-weight:800;color:#f59e0b;">{{ members | sum(attribute='villages') | int }}</div>
           <div style="font-size:0.75rem;color:var(--text-muted);">🏘️ Villages</div>
         </div>
         <div class="card" style="padding:0.75rem 0.9rem;text-align:center;">
-          <div style="font-size:1.5rem;font-weight:800;color:#22c55e;">{{ "{:,}".format(members | sum(attribute='population') | int).replace(",",".") }}</div>
+          <div style="font-size:1rem;font-weight:800;color:#22c55e;">{{ "{:,}".format(members | sum(attribute='population') | int).replace(",",".") }}</div>
           <div style="font-size:0.75rem;color:var(--text-muted);">🌍 Population</div>
         </div>
         <div class="card" style="padding:0.75rem 0.9rem;text-align:center;">
-          <div style="font-size:1.5rem;font-weight:800;color:#93c5fd;">{{ "{:,}".format(members | sum(attribute='points') | int).replace(",",".") }}</div>
+          <div style="font-size:1rem;font-weight:800;color:#93c5fd;">{{ "{:,}".format(members | sum(attribute='points') | int).replace(",",".") }}</div>
           <div style="font-size:0.75rem;color:var(--text-muted);">🏆 Punkte</div>
         </div>
       </div>

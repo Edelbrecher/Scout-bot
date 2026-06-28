@@ -5,23 +5,17 @@
 {% from "_combat_flow.html" import combat_flow %}
 <div class="container">
 
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.4rem;margin-bottom:.5rem;">
     <div>
-      <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:.2rem 0 .1rem;font-size:1.5rem;"><span data-i18n="defense.title">🛡️ Defense</span></h1>
-      <p class="subtitle" style="margin:0;" data-i18n="defense.subtitle">Defend and timed-defend requests of this alliance</p>
+      <a href="/guild/{{ guild.guild_id }}" class="back-link" style="font-size:.72rem;">← {{ guild.guild_name }}</a>
+      <h1 style="margin:.1rem 0 0;font-size:1rem;"><span data-i18n="defense.title">🛡️ Defense</span></h1>
+      <p class="subtitle" style="margin:0;font-size:.68rem;" data-i18n="defense.subtitle">Defend and timed-defend requests</p>
     </div>
-    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
-      <a href="/guild/{{ guild.guild_id }}/verteidigung/stats"
-         style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.45rem 1rem;
-                background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.35);
-                border-radius:8px;font-size:0.85rem;font-weight:600;color:#818cf8;text-decoration:none;">
+    <div style="display:flex;gap:.25rem;flex-wrap:wrap;align-items:center;">
+      <a href="/guild/{{ guild.guild_id }}/verteidigung/stats" class="btn btn-secondary" style="font-size:.68rem;padding:.2rem .45rem;">
         <span data-i18n="defense.stats.btn">📊 Statistics</span>
       </a>
-      <a href="/guild/{{ guild.guild_id }}/defense/hero-scout"
-         style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.45rem 1rem;
-                background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);
-                border-radius:8px;font-size:0.85rem;font-weight:600;color:#f59e0b;text-decoration:none;">
+      <a href="/guild/{{ guild.guild_id }}/defense/hero-scout" class="btn btn-secondary" style="font-size:.68rem;padding:.2rem .45rem;border-color:rgba(245,158,11,.3);color:#f59e0b;">
         <span data-i18n="defense.heroscout.btn">🗡️ Hero Scout</span>
       </a>
     </div>
