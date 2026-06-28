@@ -1820,6 +1820,47 @@ class BattleReportModal(discord.ui.Modal, title="⚔️ Submit Battle Report"):
         )
 
 
+class AttackImportModal(discord.ui.Modal, title="⚔️ Import Rally Point"):
+    rally_text = discord.ui.TextInput(
+        label="Rally Point Text",
+        style=discord.TextStyle.long,
+        placeholder="Paste the full rally point page from Travian here…",
+        required=True,
+        max_length=4000,
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        guild_id = str(interaction.guild_id)
+        raw = self.rally_text.value
+        import aiohttp
+        try:
+            async with aiohttp.ClientSession() as session:
+                r = await session.post(
+                    f"http://web:8080/guild/{guild_id}/attacks/import-rally-raw",
+                    json={
+                        "text": raw,
+                        "discord_id": str(interaction.user.id),
+                        "discord_name": interaction.user.display_name,
+                    },
+                    timeout=aiohttp.ClientTimeout(total=10),
+                )
+                d = await r.json()
+            parsed = d.get("parsed", 0)
+            saved = d.get("saved", 0)
+            skipped = d.get("skipped", 0)
+            if saved > 0 and skipped > 0:
+                msg = f"✅ **{saved}** attack(s) imported · ⏭️ {skipped} already known · {parsed} parsed"
+            elif saved > 0:
+                msg = f"✅ **{saved}** attack(s) imported from {parsed} parsed"
+            elif parsed > 0:
+                msg = f"ℹ️ All {skipped} attacks already imported — nothing new"
+            else:
+                msg = "⚠️ No attacks detected in the pasted text. Make sure to copy the full rally point page."
+            await interaction.response.send_message(msg, ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error: {e}", ephemeral=True)
+
+
 class RequestHubView(discord.ui.View):
     # Maps each persistent button's custom_id suffix to its i18n label key.
     _LABEL_KEYS = {
@@ -1834,6 +1875,7 @@ class RequestHubView(discord.ui.View):
         "persistent:hub_enemy_scout":     "hub.btn.enemy_scout",
         "persistent:hub_poll":            "hub.btn.poll",
         "persistent:hub_battle_report":   "hub.btn.battle_report",
+        "persistent:hub_attacks":         "hub.btn.attacks",
     }
 
     def __init__(self, lang: str = "de"):
@@ -1949,6 +1991,13 @@ class RequestHubView(discord.ui.View):
                     await interaction.followup.send(f"❌ Fehler: {e}", ephemeral=True)
             except Exception:
                 pass
+
+    @discord.ui.button(
+        label="Incoming Attacks", emoji="⚔️", style=discord.ButtonStyle.danger,
+        custom_id="persistent:hub_attacks", row=3,
+    )
+    async def hub_attacks(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(AttackImportModal())
 
     async def _create_private_channel(self, interaction: discord.Interaction, channel_label: str):
         await _do_create_private_channel(interaction, channel_label)

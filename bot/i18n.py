@@ -235,6 +235,10 @@ _STRINGS: dict[str, dict[str, str]] = {
         "de": "Kampfbericht",
         "en": "Battle Report",
     },
+    "hub.btn.attacks": {
+        "de": "Angriffe melden",
+        "en": "Incoming Attacks",
+    },
 
     # ── Defend ────────────────────────────────────────────────────────────────
     "defend.title": {

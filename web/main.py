@@ -6246,6 +6246,123 @@ async def _attack_access(request, guild_id):
     return session, None
 
 
+def _parse_rally_point_text(raw_text: str) -> list[dict]:
+    import re, unicodedata
+    text = raw_text.replace('−', '-').replace(' ', ' ')
+    text = re.sub(r'[​-‏‪-‮⁠-⁤⁦-⁩﻿]', '', text)
+    lines = [l.strip() for l in text.split('\n') if l.strip()]
+    server_time = ''
+    for l in lines:
+        m = re.search(r'Serverzeit[:\s]+(\d{1,2}:\d{2}:\d{2})', l, re.I)
+        if not m:
+            m = re.search(r'Server\s*time[:\s]+(\d{1,2}:\d{2}:\d{2})', l, re.I)
+        if m:
+            server_time = m.group(1)
+            break
+    expanded = []
+    for l in lines:
+        if '\t' in l:
+            if re.match(r'^(Einheiten|Units|Troops)\b', l, re.I) or re.match(r'^(Ankunft|Arrival)\b', l, re.I):
+                expanded.append(re.sub(r'\t+', ' ', l).strip())
+            else:
+                for seg in l.split('\t'):
+                    if seg.strip():
+                        expanded.append(seg.strip())
+        else:
+            expanded.append(l)
+    ATTACK_PATTERNS = [
+        (re.compile(r'^mark attack(.+?)\s+(attacks|raids)\s+(.+?)\s*$', re.I),
+         lambda m: (m.group(1).strip(), 'raid' if 'raid' in m.group(2).lower() else 'attack', m.group(3).strip())),
+        (re.compile(r'^(?:Angriff|Attack) markieren(.+?)\s+(greift|raubt)\s+(.+?)\s+(an|aus)\s*$', re.I),
+         lambda m: (m.group(1).strip(), 'raid' if m.group(4) == 'aus' else 'attack', m.group(3).strip())),
+        (re.compile(r'^(.+?)\s+(greift|raubt)\s+(.+?)\s+(an|aus)\s*$', re.I),
+         lambda m: (m.group(1).strip(), 'raid' if m.group(4) == 'aus' else 'attack', m.group(3).strip())),
+        (re.compile(r'^(.+?)\s+(attacks|raids)\s+(.+?)\s*$', re.I),
+         lambda m: (m.group(1).strip(), 'raid' if 'raid' in m.group(2).lower() else 'attack', m.group(3).strip())),
+        (re.compile(r'^(.+?)\s+unterst[üu]tzt\s+(.+?)\s*$', re.I),
+         lambda m: (m.group(1).strip(), 'support', m.group(2).strip())),
+        (re.compile(r'^(.+?)\s+(?:reinforces?|supports?)\s+(.+?)\s*$', re.I),
+         lambda m: (m.group(1).strip(), 'support', m.group(2).strip())),
+    ]
+    COORD_RE = re.compile(r'^\(?(-?\d+)\|(-?\d+)\)?$')
+    TROOP_RE = re.compile(r'^(Einheiten|Units|Troops)\b', re.I)
+    ARRIVAL_RE = re.compile(r'^(Ankunft|Arrival)\b', re.I)
+    attacks = []
+    cur = None
+    from datetime import datetime as _dt, timedelta as _td
+    for line in expanded:
+        matched = False
+        for pat, extract in ATTACK_PATTERNS:
+            m = pat.match(line)
+            if m:
+                player, atype, dst = extract(m)
+                if len(player) < 2:
+                    continue
+                if cur:
+                    attacks.append(cur)
+                cur = {
+                    'attacker_player': player, 'attack_type': atype, 'own_village_name': dst,
+                    'attacker_village_name': '', 'attacker_x': None, 'attacker_y': None,
+                    'own_x': None, 'own_y': None, 'troops_hidden': False,
+                    'troop_count': 0, 'troop_details': {}, 'arrival_time': '',
+                    'server_time_at_import': server_time, 'fake_score': 50, 'fake_reasons': [],
+                }
+                matched = True
+                break
+        if matched or not cur:
+            continue
+        cm = COORD_RE.match(line)
+        if cm:
+            if cur['attacker_x'] is None:
+                cur['attacker_x'], cur['attacker_y'] = int(cm.group(1)), int(cm.group(2))
+            elif cur['own_x'] is None:
+                cur['own_x'], cur['own_y'] = int(cm.group(1)), int(cm.group(2))
+            continue
+        if TROOP_RE.match(line):
+            parts = TROOP_RE.sub('', line).strip().split()
+            if parts and parts[0] == '?':
+                cur['troops_hidden'] = True
+            else:
+                cur['troops_hidden'] = False
+                cur['troop_count'] = sum(int(v) for v in parts if v.isdigit())
+            continue
+        if ARRIVAL_RE.match(line):
+            am = re.search(r'(?:Std\.)?(?:um|at)\s+(\d{1,2}:\d{2}:\d{2})', line, re.I)
+            if am:
+                ts = am.group(1)
+                today = _dt.utcnow().strftime('%Y-%m-%d')
+                if server_time and ts < server_time:
+                    tomorrow = (_dt.utcnow() + _td(days=1)).strftime('%Y-%m-%d')
+                    cur['arrival_time'] = f"{tomorrow}T{ts}"
+                else:
+                    cur['arrival_time'] = f"{today}T{ts}"
+            continue
+    if cur:
+        attacks.append(cur)
+    return attacks
+
+
+@app.post("/guild/{guild_id}/attacks/import-rally-raw")
+async def attacks_import_rally_raw(request: Request, guild_id: str):
+    body = await request.json()
+    raw_text = str(body.get("text", ""))
+    discord_id = str(body.get("discord_id", ""))
+    discord_name = str(body.get("discord_name", ""))
+    if not raw_text.strip():
+        return JSONResponse({"error": "empty text", "saved": 0, "skipped": 0}, status_code=400)
+    attacks = _parse_rally_point_text(raw_text)
+    if not attacks:
+        return JSONResponse({"error": "no attacks parsed", "saved": 0, "skipped": 0, "parsed": 0})
+    for atk in attacks:
+        player = atk.get("attacker_player", "")
+        artifacts = await database.get_enemy_artifacts(guild_id, player) if player else []
+        result = _compute_fake_score_server(atk, artifacts)
+        atk["fake_score"] = result["score"]
+        atk["fake_reasons"] = result["reasons"]
+    saved, skipped = await database.save_incoming_attacks(guild_id, attacks, discord_id, discord_name)
+    return JSONResponse({"saved": saved, "skipped": skipped, "parsed": len(attacks)})
+
+
 @app.post("/guild/{guild_id}/attacks/import-rally")
 async def attacks_import_rally(request: Request, guild_id: str):
     import json as _json
