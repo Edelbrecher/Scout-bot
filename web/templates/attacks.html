@@ -1865,11 +1865,14 @@
       if (autoCollapse && !(safeKey in _villageCollapsed)) _villageCollapsed[safeKey] = true;
       const isCollapsed = !!_villageCollapsed[safeKey];
       const threatColor = realCount > 0 ? '#ef4444' : supportCount > 0 ? '#22c55e' : '#6366f1';
+      const hasArt = g.attacks.some(a => a.has_artifact);
+      const artName = hasArt ? (g.attacks.find(a => a.has_artifact)?.artifact_name || '') : '';
 
-      html += `<div class="village-card" style="border-left:2px solid ${threatColor};margin-bottom:.15rem;">
-        <div class="village-card-header" onclick="toggleVillageCollapse('${safeKey}')" style="cursor:pointer;user-select:none;padding:.18rem .45rem;display:flex;align-items:center;gap:.25rem;">
+      html += `<div class="village-card" style="border-left:2px solid ${hasArt ? '#fbbf24' : threatColor};margin-bottom:.15rem;${hasArt?'border:1px solid rgba(251,191,36,.4);':''}">
+        <div class="village-card-header" onclick="toggleVillageCollapse('${safeKey}')" style="cursor:pointer;user-select:none;padding:.18rem .45rem;display:flex;align-items:center;gap:.25rem;${hasArt?'background:rgba(251,191,36,.06);':''}">
           <span id="vc-arrow-${safeKey}" style="font-size:.5rem;color:var(--text-muted);flex-shrink:0;">${isCollapsed?'▶':'▼'}</span>
           <span style="font-size:.66rem;font-weight:700;color:var(--text);">🏰 ${escHtml(g.name)}</span>
+          ${hasArt ? `<span style="font-size:.55rem;font-weight:800;padding:.08rem .35rem;border-radius:6px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);color:#fbbf24;">🏺 ${escHtml(artName)}</span>` : ''}
           ${g.account ? `<span style="font-size:.56rem;color:#60a5fa;font-weight:600;">${escHtml(g.account)}</span>` : ''}
           <span style="font-size:.54rem;color:var(--text-muted);">${escHtml(coords)}</span>
           <div style="margin-left:auto;display:flex;align-items:center;gap:.25rem;flex-shrink:0;">
@@ -1987,11 +1990,12 @@
         ${scoreDot}
         ${typeBadge(a.attack_type)}
         <span style="font-weight:600;font-size:.66rem;color:#60a5fa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100px;">${escHtml(a.attacker_player)}</span>
+        ${a.has_artifact ? '<span style="font-size:.55rem;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.3);color:#fbbf24;border-radius:4px;padding:0 3px;font-weight:700;" title="'+escHtml(a.artifact_name||'')+'">🏺</span>' : ''}
         <span style="flex:1;min-width:0;"></span>
         ${troopShort}
         ${labelBadge(lbl)}
         ${noteDot}
-        <span style="color:var(--text-muted);font-size:.6rem;font-family:monospace;flex-shrink:0;">${fmtArrival(a.arrival_time)}</span>
+        <span style="color:#e2e8f0;font-size:.72rem;font-weight:700;font-family:monospace;flex-shrink:0;background:rgba(255,255,255,.06);padding:.05rem .3rem;border-radius:3px;">${fmtArrival(a.arrival_time)}</span>
       </div>`;
   }
 

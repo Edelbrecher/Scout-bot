@@ -6469,6 +6469,25 @@ async def attacks_api_incoming(
             if coords:
                 a["own_village_x"] = coords["x"]
                 a["own_village_y"] = coords["y"]
+    all_artifacts = await database.get_artifacts(guild_id)
+    active_arts = [a for a in all_artifacts if not a.get("is_target") and a.get("status") == "active"]
+    if active_arts:
+        from datetime import datetime as _dt, timedelta as _td
+        art_by_coords, art_by_village = {}, {}
+        for art in active_arts:
+            if art.get("x") and art.get("y"):
+                art_by_coords[(art["x"], art["y"])] = art
+            if art.get("current_village"):
+                art_by_village[art["current_village"].strip().lower()] = art
+        for a in attacks:
+            vx, vy = a.get("own_village_x"), a.get("own_village_y")
+            vname = (a.get("own_village_name") or "").strip().lower()
+            art = art_by_coords.get((vx, vy)) if vx is not None else None
+            if not art and vname:
+                art = art_by_village.get(vname)
+            if art:
+                a["has_artifact"] = True
+                a["artifact_name"] = art.get("name", "")
     return JSONResponse(attacks)
 
 
@@ -12647,10 +12666,12 @@ async def admin_sidebar_style_save(request: Request):
     font_family = str(body.get("font_family", "")).strip()
     font_size   = str(body.get("font_size", "")).strip()
     font_color  = str(body.get("font_color", "")).strip()
+    base_font_size = str(body.get("base_font_size", "")).strip()
     await database.set_setting("sidebar_style_config", _json_mod.dumps({
         "font_family": font_family,
         "font_size": font_size,
         "font_color": font_color,
+        "base_font_size": base_font_size,
     }))
     return JSONResponse({"ok": True})
 

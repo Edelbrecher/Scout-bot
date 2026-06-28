@@ -1008,6 +1008,8 @@ function escHtml(s) {
     else               sb.style.removeProperty('--gs-font-family');
     if (s.font_color)  sb.style.setProperty('--gs-font-color',  s.font_color);
     else               sb.style.removeProperty('--gs-font-color');
+    if (s.base_font_size) document.documentElement.style.fontSize = s.base_font_size;
+    else                  document.documentElement.style.fontSize = '';
   }
 
   function gsSidebarToggle() {

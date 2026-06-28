@@ -85,6 +85,17 @@
             </div>
           </div>
           <div>
+            <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:.3rem;">📐 Global Page Font Size</label>
+            <select id="styleBaseFontSize" style="background:var(--bg-input);border:1px solid var(--border);border-radius:7px;padding:.4rem .65rem;color:var(--text);font-size:.85rem;">
+              <option value="">— Default (14px) —</option>
+              <option value="12px">12px (compact)</option>
+              <option value="13px">13px</option>
+              <option value="14px">14px</option>
+              <option value="15px">15px</option>
+              <option value="16px">16px (large)</option>
+            </select>
+          </div>
+          <div>
             <button onclick="saveStyle()" class="btn btn-primary" style="font-size:.85rem;">💾 Save</button>
             <span id="styleSaveMsg" style="display:none;margin-left:.6rem;font-size:.8rem;color:#4ade80;">✅ Saved</span>
           </div>
@@ -884,6 +895,12 @@ render();
       document.getElementById('styleFontColor').value = s.font_color;
       document.getElementById('styleFontColorText').value = s.font_color;
     }
+    if (s.base_font_size) {
+      const sel = document.getElementById('styleBaseFontSize');
+      for (let i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === s.base_font_size) { sel.selectedIndex = i; break; }
+      }
+    }
   } catch(e) {}
 })();
 
@@ -891,10 +908,11 @@ async function saveStyle() {
   const font_family = document.getElementById('styleFontFamily').value;
   const font_size   = document.getElementById('styleFontSize').value;
   const font_color  = document.getElementById('styleFontColorText').value.trim() || document.getElementById('styleFontColor').value;
+  const base_font_size = document.getElementById('styleBaseFontSize').value;
   const r = await fetch('/admin/sidebar/style', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ font_family, font_size, font_color: font_color === '#6b7280' ? '' : font_color })
+    body: JSON.stringify({ font_family, font_size, font_color: font_color === '#6b7280' ? '' : font_color, base_font_size })
   });
   if (r.ok) {
     // Invalidate style cache so next page load picks up new values
