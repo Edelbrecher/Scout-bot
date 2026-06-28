@@ -6,21 +6,21 @@
 <div class="container">
   <div class="page-header" style="margin-bottom:.5rem;">
     <a href="/guild/{{ guild.guild_id }}" class="back-link" style="font-size:.75rem;">&larr; {{ guild.guild_name }}</a>
-    <h1 style="margin:.15rem 0 0;font-size:1.15rem;">&#x2694;&#xFE0F; Attacks</h1>
-    <p class="subtitle" style="margin:0;font-size:.72rem;">Import incoming attacks · detect fakes · coordinate defense</p>
+    <h1 style="margin:.1rem 0 0;font-size:1rem;">&#x2694;&#xFE0F; Attacks</h1>
+    <p class="subtitle" style="margin:0;font-size:.65rem;">Import attacks · detect fakes · coordinate defense</p>
   </div>
 
   {{ combat_flow(guild.guild_id, "attacks") }}
 
-  <div style="display:flex;gap:.3rem;align-items:center;flex-wrap:wrap;margin-bottom:.65rem;">
-    <button class="btn btn-primary" onclick="openImportModal()" style="font-size:.75rem;padding:.28rem .55rem;">Import Rally Point</button>
-    <a href="/guild/{{ guild.guild_id }}/attacks/alliance-overview" class="btn btn-secondary" style="font-size:.75rem;padding:.28rem .55rem;">Alliance Analysis</a>
-    <a href="/guild/{{ guild.guild_id }}/attacks/own-troops" class="btn btn-secondary" style="font-size:.75rem;padding:.28rem .55rem;">Own Villages</a>
-    <button class="btn btn-secondary" id="btnAnalysisToggle" onclick="toggleAnalysisPanel()" style="font-size:.75rem;padding:.28rem .55rem;">Analysis</button>
+  <div style="display:flex;gap:.2rem;align-items:center;flex-wrap:wrap;margin-bottom:.45rem;">
+    <button class="btn btn-primary" onclick="openImportModal()" style="font-size:.68rem;padding:.2rem .45rem;">Import Rally Point</button>
+    <a href="/guild/{{ guild.guild_id }}/attacks/alliance-overview" class="btn btn-secondary" style="font-size:.68rem;padding:.2rem .45rem;">Alliance</a>
+    <a href="/guild/{{ guild.guild_id }}/attacks/own-troops" class="btn btn-secondary" style="font-size:.68rem;padding:.2rem .45rem;">Own Villages</a>
+    <button class="btn btn-secondary" id="btnAnalysisToggle" onclick="toggleAnalysisPanel()" style="font-size:.68rem;padding:.2rem .45rem;">Analysis</button>
     {% if can_label %}
-    <button class="btn btn-secondary" onclick="toggleArchivedView()" style="font-size:.75rem;padding:.28rem .55rem;">Archive</button>
-    <button class="btn btn-secondary" onclick="confirmArchiveAll()" style="font-size:.75rem;padding:.28rem .55rem;color:#a5b4fc;">Archive All</button>
-    <button class="btn btn-secondary" onclick="confirmDeleteAll()" style="font-size:.75rem;padding:.28rem .55rem;color:#f87171;">Delete All</button>
+    <button class="btn btn-secondary" onclick="toggleArchivedView()" style="font-size:.68rem;padding:.2rem .45rem;">Archive</button>
+    <button class="btn btn-secondary" onclick="confirmArchiveAll()" style="font-size:.68rem;padding:.2rem .45rem;color:#a5b4fc;">Archive All</button>
+    <button class="btn btn-secondary" onclick="confirmDeleteAll()" style="font-size:.68rem;padding:.2rem .45rem;color:#f87171;">Delete All</button>
     {% endif %}
   </div>
 
@@ -407,38 +407,38 @@
     <div class="card" style="padding:0;overflow:hidden;margin-bottom:.5rem;">
 
       <!-- Top bar -->
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem .75rem;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:.3rem;">
-        <div style="display:flex;align-items:center;gap:.45rem;">
-          <span style="font-size:.82rem;font-weight:700;">⚔️ Incoming</span>
-          <span id="atkTotalBadge" style="font-size:.65rem;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.25);color:#a5b4fc;border-radius:8px;padding:1px 7px;font-weight:700;"></span>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:.3rem .6rem;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:.2rem;">
+        <div style="display:flex;align-items:center;gap:.35rem;">
+          <span style="font-size:.72rem;font-weight:700;">⚔️ Incoming</span>
+          <span id="atkTotalBadge" style="font-size:.58rem;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.2);color:#a5b4fc;border-radius:6px;padding:1px 5px;font-weight:700;"></span>
         </div>
-        <div style="display:flex;gap:.3rem;align-items:center;flex-wrap:wrap;">
+        <div style="display:flex;gap:.2rem;align-items:center;flex-wrap:wrap;">
           {% if can_label %}
-          <label style="display:flex;align-items:center;gap:.2rem;font-size:.7rem;color:var(--text-muted);cursor:pointer;user-select:none;">
-            <input type="checkbox" id="selectAllCbx" onchange="toggleSelectAll(this.checked)" style="accent-color:#6366f1;width:13px;height:13px;"> All
+          <label style="display:flex;align-items:center;gap:.15rem;font-size:.62rem;color:var(--text-muted);cursor:pointer;user-select:none;">
+            <input type="checkbox" id="selectAllCbx" onchange="toggleSelectAll(this.checked)" style="accent-color:#6366f1;width:12px;height:12px;"> All
           </label>
           {% endif %}
-          <select id="filterType" onchange="applyFilters()" style="font-size:.7rem;padding:.15rem .4rem;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);">
+          <select id="filterType" onchange="applyFilters()" style="font-size:.62rem;padding:.12rem .3rem;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);">
             <option value="">All types</option>
             <option value="attack">⚔️ Attacks</option>
             <option value="raid">💰 Raids</option>
             <option value="support">🛡️ Support</option>
           </select>
-          <button class="btn btn-secondary" style="font-size:.7rem;padding:.18rem .45rem;" onclick="loadOwnAttacks()">↻</button>
+          <button class="btn btn-secondary" style="font-size:.62rem;padding:.12rem .35rem;" onclick="loadOwnAttacks()">↻</button>
           {% if can_label %}
-          <button class="btn btn-secondary" id="btnTestData" onclick="insertTestData()" style="font-size:.68rem;padding:.18rem .45rem;border-color:rgba(168,85,247,.35);color:#c084fc;" title="Insert test data">🧪</button>
+          <button class="btn btn-secondary" id="btnTestData" onclick="insertTestData()" style="font-size:.6rem;padding:.12rem .35rem;border-color:rgba(168,85,247,.35);color:#c084fc;" title="Insert test data">🧪</button>
           {% endif %}
         </div>
       </div>
 
       <!-- Search/filter bar -->
-      <div style="display:flex;flex-wrap:wrap;gap:.25rem;padding:.3rem .75rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.015);">
-        <input id="fAtkName"     type="search" placeholder="🗡️ Attacker"     oninput="loadOwnAttacks()" style="flex:1;min-width:90px;max-width:140px;font-size:.7rem;padding:.18rem .35rem;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);">
-        <input id="fAtkAlliance" type="search" placeholder="🛡 Atk Ally"     oninput="loadOwnAttacks()" style="flex:1;min-width:80px;max-width:120px;font-size:.7rem;padding:.18rem .35rem;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);">
-        <input id="fAtkVillage"  type="search" placeholder="📍 Atk Vill"    oninput="loadOwnAttacks()" style="flex:1;min-width:80px;max-width:120px;font-size:.7rem;padding:.18rem .35rem;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);">
-        <input id="fDefAlliance" type="search" placeholder="🏰 Def Ally"    oninput="loadOwnAttacks()" style="flex:1;min-width:80px;max-width:120px;font-size:.7rem;padding:.18rem .35rem;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);">
-        <input id="fDefVillage"  type="search" placeholder="🏘️ Def Vill"    oninput="loadOwnAttacks()" style="flex:1;min-width:80px;max-width:120px;font-size:.7rem;padding:.18rem .35rem;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);">
-        <button onclick="clearAdvFilters()" style="font-size:.65rem;padding:.15rem .4rem;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:5px;color:var(--text-muted);cursor:pointer;">✕</button>
+      <div style="display:flex;flex-wrap:wrap;gap:.2rem;padding:.2rem .6rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.015);">
+        <input id="fAtkName"     type="search" placeholder="🗡️ Attacker"     oninput="loadOwnAttacks()" style="flex:1;min-width:75px;max-width:120px;font-size:.62rem;padding:.12rem .3rem;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+        <input id="fAtkAlliance" type="search" placeholder="🛡 Atk Ally"     oninput="loadOwnAttacks()" style="flex:1;min-width:70px;max-width:100px;font-size:.62rem;padding:.12rem .3rem;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+        <input id="fAtkVillage"  type="search" placeholder="📍 Atk Vill"    oninput="loadOwnAttacks()" style="flex:1;min-width:70px;max-width:100px;font-size:.62rem;padding:.12rem .3rem;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+        <input id="fDefAlliance" type="search" placeholder="🏰 Def Ally"    oninput="loadOwnAttacks()" style="flex:1;min-width:70px;max-width:100px;font-size:.62rem;padding:.12rem .3rem;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+        <input id="fDefVillage"  type="search" placeholder="🏘️ Def Vill"    oninput="loadOwnAttacks()" style="flex:1;min-width:70px;max-width:100px;font-size:.62rem;padding:.12rem .3rem;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+        <button onclick="clearAdvFilters()" style="font-size:.58rem;padding:.1rem .3rem;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:4px;color:var(--text-muted);cursor:pointer;">✕</button>
       </div>
 
       <!-- Bulk bar -->
@@ -478,9 +478,9 @@
       <!-- ── LEFT: ATTACK LIST ── -->
       <div class="card" style="padding:0;overflow:hidden;">
         <div style="border-bottom:1px solid var(--border);background:rgba(255,255,255,.02);">
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:.35rem .65rem .25rem;">
-            <span id="colLBadge" style="font-size:.65rem;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.25);color:#a5b4fc;border-radius:8px;padding:1px 7px;font-weight:700;">–</span>
-            <select id="colLFilter" onchange="applyFilters()" style="font-size:.7rem;padding:.15rem .4rem;background:var(--bg-card);border:1px solid var(--border);border-radius:5px;color:var(--text);font-weight:600;cursor:pointer;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:.25rem .5rem .18rem;">
+            <span id="colLBadge" style="font-size:.58rem;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.2);color:#a5b4fc;border-radius:6px;padding:1px 5px;font-weight:700;">–</span>
+            <select id="colLFilter" onchange="applyFilters()" style="font-size:.62rem;padding:.1rem .3rem;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;color:var(--text);font-weight:600;cursor:pointer;">
               <option value="" selected>🌐 All</option>
               <option value="_real">🟢 Real (&lt;60)</option>
               <option value="_fakescore">🔴 Fake (≥70)</option>
@@ -492,7 +492,7 @@
               <option value="_unlabeled">❓ Unlabeled</option>
             </select>
           </div>
-          <div id="colLToggles" style="display:flex;flex-wrap:wrap;gap:.2rem;padding:.2rem .65rem .35rem;"></div>
+          <div id="colLToggles" style="display:flex;flex-wrap:wrap;gap:.15rem;padding:.15rem .5rem .25rem;"></div>
         </div>
         <div id="colLContent" style="min-height:100px;max-height:78vh;overflow-y:auto;"></div>
       </div>
@@ -1841,16 +1841,16 @@
       const isCollapsed = !!_villageCollapsed[safeKey];
       const threatColor = realCount > 0 ? '#ef4444' : supportCount > 0 ? '#22c55e' : '#6366f1';
 
-      html += `<div class="village-card" style="border-left:2px solid ${threatColor};margin-bottom:.25rem;">
-        <div class="village-card-header" onclick="toggleVillageCollapse('${safeKey}')" style="cursor:pointer;user-select:none;padding:.25rem .55rem;display:flex;align-items:center;gap:.3rem;">
-          <span id="vc-arrow-${safeKey}" style="font-size:.55rem;color:var(--text-muted);flex-shrink:0;">${isCollapsed?'▶':'▼'}</span>
-          <span style="font-size:.73rem;font-weight:700;color:var(--text);">🏰 ${escHtml(g.name)}</span>
-          ${g.account ? `<span style="font-size:.62rem;color:#60a5fa;font-weight:600;">${escHtml(g.account)}</span>` : ''}
-          <span style="font-size:.6rem;color:var(--text-muted);">${escHtml(coords)}</span>
-          <div style="margin-left:auto;display:flex;align-items:center;gap:.3rem;flex-shrink:0;">
-            <span style="font-size:.6rem;color:var(--text-muted);">${g.attacks.length}</span>
-            ${realCount > 0 ? `<span style="color:#f87171;font-size:.6rem;font-weight:700;">⚠️${realCount}</span>` : ''}
-            ${supportCount > 0 ? `<span style="color:#4ade80;font-size:.6rem;">🛡️${supportCount}</span>` : ''}
+      html += `<div class="village-card" style="border-left:2px solid ${threatColor};margin-bottom:.15rem;">
+        <div class="village-card-header" onclick="toggleVillageCollapse('${safeKey}')" style="cursor:pointer;user-select:none;padding:.18rem .45rem;display:flex;align-items:center;gap:.25rem;">
+          <span id="vc-arrow-${safeKey}" style="font-size:.5rem;color:var(--text-muted);flex-shrink:0;">${isCollapsed?'▶':'▼'}</span>
+          <span style="font-size:.66rem;font-weight:700;color:var(--text);">🏰 ${escHtml(g.name)}</span>
+          ${g.account ? `<span style="font-size:.56rem;color:#60a5fa;font-weight:600;">${escHtml(g.account)}</span>` : ''}
+          <span style="font-size:.54rem;color:var(--text-muted);">${escHtml(coords)}</span>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:.25rem;flex-shrink:0;">
+            <span style="font-size:.54rem;color:var(--text-muted);">${g.attacks.length}</span>
+            ${realCount > 0 ? `<span style="color:#f87171;font-size:.54rem;font-weight:700;">⚠️${realCount}</span>` : ''}
+            ${supportCount > 0 ? `<span style="color:#4ade80;font-size:.54rem;">🛡️${supportCount}</span>` : ''}
           </div>
         </div>
         <div id="vc-body-${safeKey}" style="display:${isCollapsed?'none':'flex'};flex-direction:column;gap:0;">`;
@@ -1954,17 +1954,17 @@
 
     return `
       <div class="atk-row${lblClass}${_selectedAttackId===a.id?' atk-active':''}" data-id="${a.id}" data-label="${lbl}"
-           style="display:flex;align-items:center;gap:.3rem;padding:.22rem .55rem;border-bottom:1px solid rgba(255,255,255,.03);cursor:pointer;flex-wrap:nowrap;"
+           style="display:flex;align-items:center;gap:.25rem;padding:.15rem .45rem;border-bottom:1px solid rgba(255,255,255,.025);cursor:pointer;flex-wrap:nowrap;"
            onclick="selectAttack(${a.id}, event)">
         ${cbx}
         ${scoreDot}
         ${typeBadge(a.attack_type)}
-        <span style="font-weight:600;font-size:.72rem;color:#60a5fa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px;">${escHtml(a.attacker_player)}</span>
+        <span style="font-weight:600;font-size:.66rem;color:#60a5fa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100px;">${escHtml(a.attacker_player)}</span>
         <span style="flex:1;min-width:0;"></span>
         ${troopShort}
         ${labelBadge(lbl)}
         ${noteDot}
-        <span style="color:var(--text-muted);font-size:.66rem;font-family:monospace;flex-shrink:0;">${fmtArrival(a.arrival_time)}</span>
+        <span style="color:var(--text-muted);font-size:.6rem;font-family:monospace;flex-shrink:0;">${fmtArrival(a.arrival_time)}</span>
       </div>`;
   }
 
