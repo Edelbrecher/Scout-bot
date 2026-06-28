@@ -848,15 +848,21 @@ async def _save_and_update_tracking(
     tracking_embed = _build_defend_tracking_embed(contributions, lang, coords, tw_world, goal_raw, ratio)
 
     tracking_msg_id = (defend_rec or {}).get("tracking_msg_id")
+    edited = False
     if tracking_msg_id:
         try:
             msg = await interaction.channel.fetch_message(int(tracking_msg_id))
             await msg.edit(embed=tracking_embed)
-            tracking_msg_id = tracking_msg_id  # still valid
-        except Exception:
-            tracking_msg_id = None
+            edited = True
+        except Exception as e:
+            print(f"[defend] Could not edit tracking msg {tracking_msg_id}: {e}", flush=True)
+            try:
+                msg = await interaction.channel.fetch_message(int(tracking_msg_id))
+                await msg.delete()
+            except Exception:
+                pass
 
-    if not tracking_msg_id:
+    if not edited:
         new_msg = await interaction.channel.send(embed=tracking_embed)
         await database.set_defend_tracking_msg(channel_id, str(new_msg.id))
 
