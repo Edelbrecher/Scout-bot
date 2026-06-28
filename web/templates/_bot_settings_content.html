@@ -133,6 +133,7 @@
   {% set scout_roles      = (guild.allowed_role_ids or '').split(',') | map('trim') | list %}
   {% set scout_view_roles = (guild.scout_view_role_ids or '').split(',') | map('trim') | list %}
   {% set art_rules_roles  = (guild.artifact_rules_role_ids or '').split(',') | map('trim') | list %}
+  {% set art_interest_roles = (guild.artifact_interest_role_ids or '').split(',') | map('trim') | list %}
   {% set res_roles        = (guild.res_manager_role_ids or '').split(',') | map('trim') | list %}
   {% set res_view_roles   = (guild.res_push_view_role_ids or '').split(',') | map('trim') | list %}
   {% set private_roles    = (guild.private_channel_role_ids or '').split(',') | map('trim') | list %}
@@ -152,6 +153,7 @@
           <th>🛡️ Defend</th>
           <th>📦 Archiv</th>
           <th>🏺 Art. Rules</th>
+          <th>⭐ Art. Interest</th>
           {% if ally_group %}<th>🏛️ Ally-Bonuses</th>{% endif %}
         </tr>
       </thead>
@@ -207,6 +209,12 @@
               data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="artifact_rules_role_ids"
               title="Can edit artifact rotation rules"
             >{{ '✅' if role.id in art_rules_roles else '○' }}</button>
+          </td>
+          <td style="text-align:center;">
+            <button class="role-toggle {% if role.id in art_interest_roles %}active{% endif %}"
+              data-guild="{{ guild.guild_id }}" data-role="{{ role.id }}" data-field="artifact_interest_role_ids"
+              title="Can view artifact interest registrations"
+            >{{ '✅' if role.id in art_interest_roles else '○' }}</button>
           </td>
           {% if ally_group %}
           <td style="text-align:center;">

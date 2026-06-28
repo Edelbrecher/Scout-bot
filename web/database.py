@@ -547,7 +547,8 @@ async def init_db():
                     "farmlist_score_good INTEGER DEFAULT 100",
                     "farmlist_score_ok INTEGER DEFAULT 1",
                     "scout_view_role_ids TEXT",
-                    "artifact_rules_role_ids TEXT"]:
+                    "artifact_rules_role_ids TEXT",
+                    "artifact_interest_role_ids TEXT"]:
             try:
                 await db.execute(f"ALTER TABLE guild_configs ADD COLUMN {col}")
                 await db.commit()
@@ -1420,7 +1421,7 @@ async def is_report_channel(channel_id: str) -> bool:
             return await cur.fetchone() is not None
 
 
-_ALLOWED_ROLE_FIELDS = {"allowed_role_ids", "res_manager_role_ids", "private_channel_role_ids", "defend_role_ids", "archive_role_ids", "res_push_view_role_ids", "scout_view_role_ids", "artifact_rules_role_ids"}
+_ALLOWED_ROLE_FIELDS = {"allowed_role_ids", "res_manager_role_ids", "private_channel_role_ids", "defend_role_ids", "archive_role_ids", "res_push_view_role_ids", "scout_view_role_ids", "artifact_rules_role_ids", "artifact_interest_role_ids"}
 
 async def toggle_role_in_field(guild_id: str, role_id: str, field: str) -> bool:
     """Toggle role_id in field. Returns True=added, False=removed."""
@@ -4160,6 +4161,40 @@ async def _init_admin_tables():
             )
         """)
         await db.commit()
+
+
+async def upsert_artifact_interest(guild_id: str, artifact_id: int, discord_id: str, discord_name: str, priority: str) -> int:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        cur = await db.execute("""
+            INSERT INTO artifact_interests (guild_id, artifact_id, discord_id, discord_name, priority)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(guild_id, artifact_id, discord_id) DO UPDATE SET
+                priority = excluded.priority, discord_name = excluded.discord_name
+        """, (guild_id, artifact_id, discord_id, discord_name, priority))
+        await db.commit()
+        return cur.lastrowid
+
+
+async def remove_artifact_interest(guild_id: str, artifact_id: int, discord_id: str):
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute(
+            "DELETE FROM artifact_interests WHERE guild_id=? AND artifact_id=? AND discord_id=?",
+            (guild_id, artifact_id, discord_id))
+        await db.commit()
+
+
+async def get_artifact_interests(guild_id: str, artifact_id: int = None) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        if artifact_id:
+            async with db.execute(
+                "SELECT * FROM artifact_interests WHERE guild_id=? AND artifact_id=? ORDER BY CASE priority WHEN 'high' THEN 0 WHEN 'mid' THEN 1 ELSE 2 END, created_at",
+                (guild_id, artifact_id)) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+        async with db.execute(
+            "SELECT * FROM artifact_interests WHERE guild_id=? ORDER BY artifact_id, CASE priority WHEN 'high' THEN 0 WHEN 'mid' THEN 1 ELSE 2 END, created_at",
+            (guild_id,)) as cur:
+            return [dict(r) for r in await cur.fetchall()]
 
 
 async def get_setting(key: str) -> str | None:
@@ -12630,6 +12665,29 @@ async def _init_artifact_tables():
         for col in [
             "alliance_name TEXT DEFAULT ''",
             "is_target INTEGER DEFAULT 0",
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE artifacts ADD COLUMN {col}")
+                await db.commit()
+            except Exception:
+                pass
+        # Artifact interest requests
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS artifact_interests (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id        TEXT NOT NULL,
+                artifact_id     INTEGER NOT NULL,
+                discord_id      TEXT NOT NULL,
+                discord_name    TEXT DEFAULT '',
+                priority        TEXT DEFAULT 'mid',
+                created_at      TEXT DEFAULT (datetime('now')),
+                UNIQUE(guild_id, artifact_id, discord_id)
+            )
+        """)
+        await db.commit()
+        for col in [
+            "interest_channel_id TEXT DEFAULT ''",
+            "interest_message_ids TEXT DEFAULT ''",
         ]:
             try:
                 await db.execute(f"ALTER TABLE artifacts ADD COLUMN {col}")

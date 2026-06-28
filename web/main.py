@@ -2808,7 +2808,7 @@ async def toggle_role(request: Request, guild_id: str, role_id: str, field: str 
     if err: return JSONResponse({"error": "unauthorized"}, status_code=403)
     err = _require_guild(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
-    if field not in {"allowed_role_ids", "res_manager_role_ids", "private_channel_role_ids", "defend_role_ids", "archive_role_ids", "res_push_view_role_ids", "scout_view_role_ids", "artifact_rules_role_ids"}:
+    if field not in {"allowed_role_ids", "res_manager_role_ids", "private_channel_role_ids", "defend_role_ids", "archive_role_ids", "res_push_view_role_ids", "scout_view_role_ids", "artifact_rules_role_ids", "artifact_interest_role_ids"}:
         return JSONResponse({"error": "invalid field"}, status_code=400)
     if not SNOWFLAKE_RE.match(role_id):
         return JSONResponse({"error": "invalid role_id"}, status_code=400)
@@ -17519,6 +17519,7 @@ async def artifacts_page(request: Request, guild_id: str):
             if a:
                 own_names.add(a.strip().upper())
     can_edit_rules = is_leader or await has_perm(request, guild_id, "ally_manage") or await _user_has_role_field(session, guild_id, "artifact_rules_role_ids")
+    can_view_interests = is_leader or await has_perm(request, guild_id, "ally_manage") or await _user_has_role_field(session, guild_id, "artifact_interest_role_ids")
     return templates.TemplateResponse("artifacts.html", {
         "request": request, "guild": guild,
         "artifacts": artifacts, "is_leader": is_leader,
@@ -17527,6 +17528,7 @@ async def artifacts_page(request: Request, guild_id: str):
         "saved": saved,
         "own_alliance_names": own_names,
         "can_edit_rules": can_edit_rules,
+        "can_view_interests": can_view_interests,
     })
 
 
@@ -17567,6 +17569,36 @@ async def artifact_add(request: Request, guild_id: str):
         is_target=1 if form.get("is_target") else 0,
     )
     return RedirectResponse(f"/guild/{guild_id}/artifacts/{aid}?saved=1", status_code=303)
+
+
+@app.post("/guild/{guild_id}/artifacts/interest/setup")
+async def artifact_interest_setup(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "auth"}, status_code=401)
+    if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    artifacts = await database.get_artifacts(guild_id)
+    active = [a for a in artifacts if not a.get("is_target") and a.get("status") == "active"]
+    if not active:
+        return JSONResponse({"error": "No active artifacts"}, status_code=400)
+    import httpx as _httpx
+    try:
+        async with _httpx.AsyncClient(timeout=15) as client:
+            r = await client.post("http://bot:7777/api/create-interest-channel", json={
+                "guild_id": guild_id,
+                "artifacts": [{"id": a["id"], "name": a["name"], "artifact_size": a.get("artifact_size", "small")} for a in active],
+            })
+            return JSONResponse(r.json(), status_code=r.status_code)
+    except Exception as e:
+        return JSONResponse({"error": f"Bot unreachable: {e}"}, status_code=502)
+
+
+@app.get("/guild/{guild_id}/artifacts/interest/data")
+async def artifact_interest_data(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "auth"}, status_code=401)
+    interests = await database.get_artifact_interests(guild_id)
+    return JSONResponse(interests)
 
 
 @app.post("/guild/{guild_id}/artifacts/send-invite")

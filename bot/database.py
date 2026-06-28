@@ -1750,3 +1750,34 @@ async def find_member_discord_id(guild_id: str, player_name: str) -> str | None:
                 return row["discord_id"] if row and row["discord_id"] else None
         except Exception:
             return None
+
+
+async def get_artifacts(guild_id: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM artifacts WHERE guild_id=? AND is_target=0 AND status='active' ORDER BY artifact_size DESC, name",
+            (guild_id,)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def upsert_artifact_interest(guild_id: str, artifact_id: int, discord_id: str, discord_name: str, priority: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO artifact_interests (guild_id, artifact_id, discord_id, discord_name, priority)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(guild_id, artifact_id, discord_id) DO UPDATE SET
+                priority = excluded.priority, discord_name = excluded.discord_name
+        """, (guild_id, artifact_id, discord_id, discord_name, priority))
+        await db.commit()
+
+
+async def get_artifact_interests(guild_id: str, artifact_id: int) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM artifact_interests WHERE guild_id=? AND artifact_id=? ORDER BY CASE priority WHEN 'high' THEN 0 WHEN 'mid' THEN 1 ELSE 2 END",
+            (guild_id, artifact_id)
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]

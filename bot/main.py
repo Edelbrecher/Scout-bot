@@ -62,6 +62,7 @@ class ScouterBot(commands.Bot):
         await self.load_extension("cogs.crop_tracker")
         await self.load_extension("cogs.digest")
         await self.load_extension("cogs.artifact_rotation")
+        await self.load_extension("cogs.artifact_interest")
         await self.load_extension("cogs.wewin")
         await self.tree.sync()
         print("Slash commands synced.")
@@ -1841,6 +1842,55 @@ async def handle_archive_rotation_channel(request: aiohttp_web.Request) -> aioht
         return aiohttp_web.json_response({"ok": False, "error": str(e)})
 
 
+async def handle_create_interest_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    data = await request.json()
+    guild_id = data.get("guild_id", "")
+    artifacts = data.get("artifacts", [])
+    if not guild_id or not artifacts:
+        return aiohttp_web.json_response({"error": "missing fields"}, status=400)
+    try:
+        guild = bot.get_guild(int(guild_id))
+        if not guild:
+            return aiohttp_web.json_response({"error": "guild not found"}, status=404)
+        cat_name = "🏺 Artifacts"
+        category = discord.utils.get(guild.categories, name=cat_name)
+        if not category:
+            category = await guild.create_category(cat_name)
+        ch_name = "artifact-interests"
+        channel = discord.utils.get(guild.text_channels, name=ch_name, category=category)
+        if not channel:
+            channel = await guild.create_text_channel(ch_name, category=category)
+        await channel.purge(limit=100)
+        embed = discord.Embed(
+            title="🏺 Artifact Interest Registration",
+            description=(
+                "Click on an artifact below to register your interest.\n"
+                "Select your priority: 🔴 High · 🟡 Mid · 🟢 Low\n\n"
+                "Leaders can view all registrations on the TravOps dashboard."
+            ),
+            color=0x6366f1,
+        )
+        await channel.send(embed=embed)
+        msg_ids = []
+        for i in range(0, len(artifacts), 5):
+            batch = artifacts[i:i+5]
+            view = discord.ui.View(timeout=None)
+            for a in batch:
+                size_emoji = {"unique": "⭐", "large": "🟡", "small": "🔵"}.get(a.get("artifact_size", ""), "🏺")
+                btn = discord.ui.Button(
+                    label=a["name"][:60],
+                    emoji=size_emoji,
+                    style=discord.ButtonStyle.secondary,
+                    custom_id=f"persistent:art_interest:{guild_id}:{a['id']}",
+                )
+                view.add_item(btn)
+            msg = await channel.send(view=view)
+            msg_ids.append(str(msg.id))
+        return aiohttp_web.json_response({"ok": True, "channel_id": str(channel.id), "message_ids": msg_ids})
+    except Exception as e:
+        return aiohttp_web.json_response({"error": str(e)}, status=500)
+
+
 async def handle_dm_invite(request: aiohttp_web.Request) -> aiohttp_web.Response:
     data = await request.json()
     discord_id = data.get("discord_id", "")
@@ -1933,6 +1983,7 @@ async def start_api_server():
     app.router.add_post("/api/create-rotation-channel", handle_create_rotation_channel)
     app.router.add_post("/api/archive-rotation-channel", handle_archive_rotation_channel)
     app.router.add_post("/api/dm-invite", handle_dm_invite)
+    app.router.add_post("/api/create-interest-channel", handle_create_interest_channel)
     runner = aiohttp_web.AppRunner(app)
     await runner.setup()
     site = aiohttp_web.TCPSite(runner, "0.0.0.0", 7777)

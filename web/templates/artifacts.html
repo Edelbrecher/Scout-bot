@@ -83,6 +83,11 @@ body.bulk-mode .art-card { padding-left:2rem; cursor:pointer; }
     <button onclick="artSwitchTab('rules')" id="art-tab-rules"
       style="font-size:.68rem;padding:.18rem .5rem;border-radius:5px 5px 0 0;cursor:pointer;font-weight:600;
              background:transparent;color:var(--text-muted);border:1px solid var(--border);border-bottom:none;">📜 Rules</button>
+    {% if can_view_interests %}
+    <button onclick="artSwitchTab('interests')" id="art-tab-interests"
+      style="font-size:.68rem;padding:.18rem .5rem;border-radius:5px 5px 0 0;cursor:pointer;font-weight:600;
+             background:transparent;color:var(--text-muted);border:1px solid var(--border);border-bottom:none;">⭐ Interests</button>
+    {% endif %}
     <span style="flex:1;"></span>
     <a href="/guild/{{ guild.guild_id }}/artifacts/planning" class="btn btn-secondary" style="font-size:.65rem;padding:.18rem .4rem;">Planning</a>
     <a href="/guild/{{ guild.guild_id }}/artifacts/run-map" class="btn btn-secondary" style="font-size:.65rem;padding:.18rem .4rem;">🗺️ Run Map</a>
@@ -281,6 +286,23 @@ body.bulk-mode .art-card { padding-left:2rem; cursor:pointer; }
       {% endif %}
     </div>
   </div>
+
+  {% if can_view_interests %}
+  <!-- Tab: Interests -->
+  <div id="art-panel-interests" style="display:none;">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem;">
+        <span style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">⭐ Artifact Interest Registrations</span>
+        {% if is_leader %}
+        <button onclick="setupInterestChannel()" class="btn btn-primary" style="font-size:.65rem;padding:.15rem .4rem;" id="setupInterestBtn">🔧 Setup Discord Channel</button>
+        {% endif %}
+      </div>
+      <div id="interestList" style="font-size:.8rem;">
+        <span style="color:var(--text-muted);">Loading…</span>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
 </div>
 
@@ -525,19 +547,18 @@ let _quill = null;
 let _rulesEditing = false;
 
 function artSwitchTab(tab) {
-  document.getElementById('art-panel-artifacts').style.display = tab==='artifacts' ? '' : 'none';
-  document.getElementById('art-panel-rules').style.display = tab==='rules' ? '' : 'none';
-  const tA = document.getElementById('art-tab-artifacts');
-  const tR = document.getElementById('art-tab-rules');
-  if (tab==='artifacts') {
-    tA.style.background='var(--primary)'; tA.style.color='#fff'; tA.style.borderColor='var(--primary)';
-    tR.style.background='transparent'; tR.style.color='var(--text-muted)'; tR.style.borderColor='var(--border)';
-  } else {
-    tR.style.background='var(--primary)'; tR.style.color='#fff'; tR.style.borderColor='var(--primary)';
-    tA.style.background='transparent'; tA.style.color='var(--text-muted)'; tA.style.borderColor='var(--border)';
-    loadRules();
-  }
-  history.replaceState(null, '', tab==='rules' ? '#rules' : location.pathname);
+  ['artifacts','rules','interests'].forEach(function(t) {
+    const panel = document.getElementById('art-panel-'+t);
+    const btn = document.getElementById('art-tab-'+t);
+    if (panel) panel.style.display = t===tab ? '' : 'none';
+    if (btn) {
+      if (t===tab) { btn.style.background='var(--primary)'; btn.style.color='#fff'; btn.style.borderColor='var(--primary)'; }
+      else { btn.style.background='transparent'; btn.style.color='var(--text-muted)'; btn.style.borderColor='var(--border)'; }
+    }
+  });
+  if (tab==='rules') loadRules();
+  if (tab==='interests') loadInterests();
+  history.replaceState(null, '', tab==='artifacts' ? location.pathname : '#'+tab);
 }
 
 async function loadRules() {
@@ -638,8 +659,61 @@ async function saveRules() {
   }
 }
 
-// Auto-open rules tab if hash is #rules
+async function loadInterests() {
+  const el = document.getElementById('interestList');
+  if (!el) return;
+  try {
+    const r = await fetch(`/guild/${_GUILD_ID}/artifacts/interest/data`);
+    const data = await r.json();
+    if (!data.length) { el.innerHTML = '<span style="color:var(--text-muted);font-style:italic;">No interest registrations yet. Set up the Discord channel first.</span>'; return; }
+    const byArt = {};
+    data.forEach(function(i) {
+      if (!byArt[i.artifact_id]) byArt[i.artifact_id] = {items: []};
+      byArt[i.artifact_id].items.push(i);
+    });
+    const prioIcon = {high:'🔴', mid:'🟡', low:'🟢'};
+    let html = '<div style="display:flex;flex-direction:column;gap:.4rem;">';
+    for (const [artId, group] of Object.entries(byArt)) {
+      const first = group.items[0];
+      html += `<div style="background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:6px;padding:.45rem .65rem;">
+        <div style="font-size:.72rem;font-weight:700;color:var(--text);margin-bottom:.3rem;">🏺 Artifact #${artId}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:.25rem;">`;
+      group.items.forEach(function(i) {
+        html += `<span style="display:inline-flex;align-items:center;gap:.2rem;font-size:.68rem;padding:.12rem .4rem;
+          border-radius:5px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);">
+          ${prioIcon[i.priority]||'⚪'} ${i.discord_name||i.discord_id}
+        </span>`;
+      });
+      html += '</div></div>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = '<span style="color:#f87171;">Error loading interests.</span>';
+  }
+}
+
+async function setupInterestChannel() {
+  const btn = document.getElementById('setupInterestBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Setting up…'; }
+  try {
+    const r = await fetch(`/guild/${_GUILD_ID}/artifacts/interest/setup`, {method:'POST'});
+    const d = await r.json();
+    if (r.ok) {
+      if (btn) { btn.textContent = '✅ Channel created'; btn.style.color = '#4ade80'; }
+    } else {
+      alert('Error: ' + (d.error || r.status));
+      if (btn) { btn.disabled = false; btn.textContent = '🔧 Setup Discord Channel'; }
+    }
+  } catch(e) {
+    alert('Network error');
+    if (btn) { btn.disabled = false; btn.textContent = '🔧 Setup Discord Channel'; }
+  }
+}
+
+// Auto-open tab from hash
 if (location.hash === '#rules') artSwitchTab('rules');
+else if (location.hash === '#interests') artSwitchTab('interests');
 </script>
 
 {% endblock %}
