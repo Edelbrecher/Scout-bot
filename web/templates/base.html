@@ -106,6 +106,13 @@
           {% endif %}
         </div>
       {% endif %}
+      <div id="nav-gs-search-wrap" style="display:none;position:relative;">
+        <input type="search" id="gs-search" placeholder="🔍 Search…" autocomplete="off"
+               oninput="gsFilterNav(this.value)" onkeydown="gsSearchKey(event)"
+               style="width:140px;font-size:.72rem;padding:.22rem .45rem;background:rgba(255,255,255,.06);
+                      border:1px solid rgba(255,255,255,.1);border-radius:6px;color:var(--text);outline:none;"
+               aria-label="Search navigation">
+      </div>
       <a href="/dashboard" data-i18n="nav.dashboard">Dashboard</a>
       <a href="/plans" data-i18n="nav.plans">Pricing</a>
       {% if _is_admin %}
@@ -486,13 +493,8 @@ function escHtml(s) {
 
   <!-- Guild Sidebar (injected via JS if on a /guild/... page) -->
   <div id="guild-sidebar" style="display:none;" aria-label="Guild navigation">
-    <div class="gs-toggle">
+    <div class="gs-toggle" style="padding:.3rem .5rem;">
       <button class="gs-toggle-btn" id="gs-collapse-btn" onclick="gsSidebarToggle()" title="Collapse sidebar">◀</button>
-    </div>
-    <div class="gs-search-wrap" id="gs-search-wrap">
-      <input type="search" id="gs-search" placeholder="Search…" autocomplete="off"
-             oninput="gsFilterNav(this.value)" onkeydown="gsSearchKey(event)"
-             aria-label="Search navigation">
     </div>
     <div class="gs-scroll" id="gs-nav-items">
       <!-- populated by JS -->
@@ -753,8 +755,9 @@ function escHtml(s) {
     var _gsSearch = document.getElementById('gs-search');
     if (_gsSearch && _gsSearch.value.trim()) { gsFilterNav(_gsSearch.value); }
 
-    // ── Workspace switcher (injected at top of sidebar) ───────────────────
-    _buildWsSwitcher(gid);
+    // Show nav search when sidebar is active
+    var navSearch = document.getElementById('nav-gs-search-wrap');
+    if (navSearch) navSearch.style.display = '';
 
     // Show sidebar
     sidebar.style.display = 'flex';
