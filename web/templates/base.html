@@ -88,24 +88,7 @@
         <span></span><span></span><span></span>
       </button>
       <div class="nav-links-extra" id="navLinksExtra">
-      {% if guild is defined and guild %}
-        {% set _world_url = guild.tw_world or '' %}
-        {% set _world_name = _world_url | replace('https://','') | replace('http://','') | replace('/','') if _world_url else '' %}
-        <div class="nav-guild-chip" style="display:flex;align-items:center;gap:.35rem;padding:.2rem .7rem;
-                    background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);
-                    border-radius:20px;font-size:.78rem;color:#a5b4fc;white-space:nowrap;max-width:220px;">
-          <span style="font-size:.85rem;">🌍</span>
-          <span style="font-weight:700;overflow:hidden;text-overflow:ellipsis;" title="{{ guild.guild_name }}">
-            {{ guild.guild_name }}
-          </span>
-          {% if _world_name %}
-          <span style="color:rgba(165,180,252,.55);font-size:.7rem;">·</span>
-          <a href="{{ _world_url }}" target="_blank" rel="noopener"
-             style="color:#818cf8;text-decoration:none;font-size:.72rem;overflow:hidden;text-overflow:ellipsis;"
-             title="{{ _world_url }}">{{ _world_name }}</a>
-          {% endif %}
-        </div>
-      {% endif %}
+      {# Guild chip removed — server info already visible in sidebar #}
       <div id="nav-gs-search-wrap" style="display:none;position:relative;">
         <input type="search" id="gs-search" placeholder="🔍 Search…" autocomplete="off"
                oninput="gsFilterNav(this.value)" onkeydown="gsSearchKey(event)"
@@ -493,9 +476,6 @@ function escHtml(s) {
 
   <!-- Guild Sidebar (injected via JS if on a /guild/... page) -->
   <div id="guild-sidebar" style="display:none;" aria-label="Guild navigation">
-    <div class="gs-toggle" style="padding:.3rem .5rem;">
-      <button class="gs-toggle-btn" id="gs-collapse-btn" onclick="gsSidebarToggle()" title="Collapse sidebar">◀</button>
-    </div>
     <div class="gs-scroll" id="gs-nav-items">
       <!-- populated by JS -->
     </div>
@@ -747,8 +727,16 @@ function escHtml(s) {
         +lockHtml
         +'</a>';
     }
-    var html = '';
-    navData.forEach(function(item){ html += buildItem(item, gid, path, false); });
+    var html = '<div style="display:flex;align-items:center;">'
+      + '<a class="gs-item' + (path==='/guild/'+gid||path==='/guild/'+gid+'/'?' active':'') + '" href="/guild/'+gid+'" data-label="Overview" style="flex:1;">'
+      + ico('home') + '<span class="gs-label">Overview</span></a>'
+      + '<button class="gs-toggle-btn" id="gs-collapse-btn" onclick="gsSidebarToggle()" title="Collapse" style="flex-shrink:0;margin-right:.3rem;">◀</button>'
+      + '</div>';
+    var skipFirst = true;
+    navData.forEach(function(item){
+      if (skipFirst && !item.type && item.icon === 'home' && (item.url_suffix === '' || !item.url_suffix)) { skipFirst = false; return; }
+      html += buildItem(item, gid, path, false);
+    });
     document.getElementById('gs-nav-items').innerHTML = html;
 
     // Re-apply active search filter if the user had typed something
@@ -758,6 +746,10 @@ function escHtml(s) {
     // Show nav search when sidebar is active
     var navSearch = document.getElementById('nav-gs-search-wrap');
     if (navSearch) navSearch.style.display = '';
+
+    // Re-apply sidebar font style (may have loaded before sidebar was built)
+    var _cachedStyle = sessionStorage.getItem('gs_style');
+    if (_cachedStyle) { try { _applySidebarStyle(JSON.parse(_cachedStyle)); } catch(e){} }
 
     // Show sidebar
     sidebar.style.display = 'flex';
