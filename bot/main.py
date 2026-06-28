@@ -1869,12 +1869,22 @@ async def handle_dm_invite(request: aiohttp_web.Request) -> aiohttp_web.Response
                         if name_lower in m.display_name.lower() or name_lower in m.name.lower() or (m.nick and name_lower in m.nick.lower()):
                             user = m
                             break
-        if not user:
-            return aiohttp_web.json_response({"error": "user not found"}, status=404)
+        guild_obj = bot.get_guild(int(guild_id)) if guild_id else None
+        if not guild_obj:
+            return aiohttp_web.json_response({"error": "guild not found"}, status=404)
+        safe_name = player_name.lower().replace(" ", "-")
+        channel = discord.utils.get(guild_obj.text_channels, name=f"private-{safe_name}")
+        if not channel:
+            for ch in guild_obj.text_channels:
+                if ch.name.startswith("private-") and safe_name in ch.name:
+                    channel = ch
+                    break
+        if not channel:
+            return aiohttp_web.json_response({"error": f"Channel 'private-{safe_name}' not found"}, status=404)
         embed = discord.Embed(
             title="🏺 Artifact Rotation — Join TravOps",
             description=(
-                f"Hey **{player_name or user.display_name}**! 👋\n\n"
+                f"Hey **{player_name}**! 👋\n\n"
                 f"You've been added to an artifact rotation in **{guild_name}**.\n"
                 f"To receive turn notifications and coordinate with your team, please join TravOps:\n\n"
                 f"👉 **[Join TravOps]({invite_url})**"
@@ -1882,8 +1892,11 @@ async def handle_dm_invite(request: aiohttp_web.Request) -> aiohttp_web.Response
             color=0x6366f1,
         )
         embed.set_footer(text="TravOps · Artifact Rotation")
-        await user.send(embed=embed)
-        return aiohttp_web.json_response({"ok": True})
+        mention = ""
+        if user:
+            mention = f"<@{user.id}>"
+        await channel.send(content=mention, embed=embed)
+        return aiohttp_web.json_response({"ok": True, "channel": channel.name})
     except Exception as e:
         return aiohttp_web.json_response({"error": str(e)}, status=500)
 
