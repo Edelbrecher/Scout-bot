@@ -115,8 +115,8 @@ def _safe(s: str) -> str:
 
 
 def _clean_coords(raw: str) -> str:
-    """Strip surrounding parentheses/brackets and whitespace from coordinate strings."""
-    return raw.strip().strip("()[]")
+    """Strip surrounding parentheses/brackets and whitespace, normalize | to /."""
+    return raw.strip().strip("()[]").replace("|", "/")
 
 
 # ---------------------------------------------------------------------------
@@ -125,7 +125,7 @@ def _clean_coords(raw: str) -> str:
 
 class HeroScoutHubModal(discord.ui.Modal, title="🦸 Helden-Scout melden"):
     player = discord.ui.TextInput(label="Spieler-Name", placeholder="z.B. Currax", max_length=100)
-    coordinates = discord.ui.TextInput(label="Koordinaten", placeholder="z.B. (102|47)", max_length=30)
+    coordinates = discord.ui.TextInput(label="Koordinaten", placeholder="z.B. 102/47 or 102|47", max_length=30)
     hero_action = discord.ui.TextInput(
         label="Helden-Aktion / Zeitpunkt",
         placeholder="z.B. Items gewechselt um 19:15 Serverzeit",
@@ -171,7 +171,7 @@ class HeroScoutHubModal(discord.ui.Modal, title="🦸 Helden-Scout melden"):
             title=f"🦸 Helden-Scout: {self.player.value}",
             color=discord.Color.teal(),
         )
-        embed.add_field(name="📍 Koordinaten", value=self.coordinates.value, inline=True)
+        embed.add_field(name="📍 Koordinaten", value=_clean_coords(self.coordinates.value), inline=True)
         embed.add_field(name="⚡ Helden-Aktion", value=self.hero_action.value, inline=False)
         if self.additional_info.value:
             embed.add_field(name="📝 Zusatz", value=self.additional_info.value, inline=False)
@@ -185,7 +185,7 @@ class HeroScoutHubModal(discord.ui.Modal, title="🦸 Helden-Scout melden"):
 
 class ScoutHubModal(discord.ui.Modal, title="🔍 Scout-Request"):
     player = discord.ui.TextInput(label="Spieler-Name", placeholder="z.B. Currax", max_length=100)
-    coordinates = discord.ui.TextInput(label="Koordinaten", placeholder="z.B. (102|47)", max_length=30)
+    coordinates = discord.ui.TextInput(label="Koordinaten", placeholder="z.B. 102/47 or 102|47", max_length=30)
     village = discord.ui.TextInput(label="Dorfname", placeholder="z.B. Hauptdorf", required=False, max_length=100)
     time = discord.ui.TextInput(label="Bis wann?", placeholder="z.B. heute 22:00 UTC", max_length=60)
     additional_info = discord.ui.TextInput(
@@ -598,7 +598,7 @@ class DefendModal(discord.ui.Modal, title="🛡️ Defend Anfrage (1/2)"):
     """Step 1 — basic defend info."""
     defender    = discord.ui.TextInput(label="Verteidiger (dein Spielername)", placeholder="z.B. Currax", max_length=100)
     attacker    = discord.ui.TextInput(label="Angreifer (Spieler)", placeholder="z.B. Maximus", max_length=100)
-    coords      = discord.ui.TextInput(label="Angriffsziel (Koords)", placeholder="z.B. (102|47)", max_length=30)
+    coords      = discord.ui.TextInput(label="Angriffsziel (Koords)", placeholder="z.B. 102/47 or 102|47", max_length=30)
     arrival     = discord.ui.TextInput(label="Ankunftszeit", placeholder="z.B. 23:45 UTC", max_length=40)
     notes       = discord.ui.TextInput(label="Notizen (optional)", required=False,
                                        style=discord.TextStyle.paragraph, max_length=200)
@@ -628,7 +628,7 @@ class TimedDefendModal(discord.ui.Modal, title="⏱️ Timed-Defend (1/2)"):
     """Step 1 — timed defend with two arrival times."""
     defender  = discord.ui.TextInput(label="Verteidiger (dein Spielername)", placeholder="z.B. Currax", max_length=100)
     attacker  = discord.ui.TextInput(label="Angreifer (Spieler)", placeholder="z.B. Maximus", max_length=100)
-    coords    = discord.ui.TextInput(label="Angriffsziel (Koords)", placeholder="z.B. (102|47)", max_length=30)
+    coords    = discord.ui.TextInput(label="Angriffsziel (Koords)", placeholder="z.B. 102/47 or 102|47", max_length=30)
     arrival   = discord.ui.TextInput(label="1. Ankunftszeit (frühere Welle)", placeholder="z.B. 23:45 UTC", max_length=40)
     arrival_2 = discord.ui.TextInput(label="2. Ankunftszeit (spätere Welle)", placeholder="z.B. 00:10 UTC", max_length=40)
 
@@ -1322,7 +1322,7 @@ class ResPushHubModal(discord.ui.Modal, title="🪖 Res-Push Request"):
 
         data = {
             "player_name": interaction.user.display_name,
-            "coordinates": self.village.value,
+            "coordinates": _clean_coords(self.village.value),
             "push_height": self.resources.value,
             "reason": "\n".join(reason_parts),
             "user_name": interaction.user.display_name,
@@ -1682,7 +1682,7 @@ class PollHubModal(discord.ui.Modal, title="📊 Create Poll"):
 class EnemyScoutModal(discord.ui.Modal, title="👁️ Gegner-Scout melden"):
     victim_player  = discord.ui.TextInput(label="Dein Spielername (Gespähter)", placeholder="z.B. Currax", max_length=100)
     victim_village = discord.ui.TextInput(label="Dein Dorf", placeholder="z.B. Hauptdorf", max_length=100, required=False)
-    victim_coords  = discord.ui.TextInput(label="Koordinaten deines Dorfes", placeholder="z.B. 102|47", max_length=30, required=False)
+    victim_coords  = discord.ui.TextInput(label="Koordinaten deines Dorfes", placeholder="z.B. 102/47 or 102|47", max_length=30, required=False)
     enemy_player   = discord.ui.TextInput(label="Gegner-Spieler (hat gespäht)", placeholder="z.B. Maximus", max_length=100)
     scout_time     = discord.ui.TextInput(label="Uhrzeit des Scouts (UTC)", placeholder="z.B. 22:45 UTC oder 2025-05-30 22:45", max_length=60)
 

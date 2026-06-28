@@ -233,7 +233,7 @@ class ResModal(discord.ui.Modal, title="Res-Push Request"):
 
         data = {
             "player_name": self.player_name.value,
-            "coordinates": self.coordinates.value,
+            "coordinates": self.coordinates.value.strip().strip("()[]").replace("|", "/"),
             "push_height": self.push_height.value,
             "reason": self.reason.value or "",
             "user_name": interaction.user.display_name,
