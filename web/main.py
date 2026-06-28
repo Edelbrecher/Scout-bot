@@ -17552,14 +17552,25 @@ async def artifact_add(request: Request, guild_id: str):
     if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
         return JSONResponse({"error": "forbidden"}, status_code=403)
     form = await request.form()
+    conquered_at = form.get("conquered_at","").strip()
+    activated_at = ""
+    if conquered_at:
+        from datetime import datetime as _dt, timedelta as _td
+        for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S", "%d.%m.%Y %H:%M", "%d.%m.%Y %H:%M:%S"):
+            try:
+                ct = _dt.strptime(conquered_at, fmt)
+                activated_at = (ct + _td(hours=24)).strftime("%Y-%m-%d %H:%M")
+                break
+            except ValueError:
+                continue
     aid = await database.create_artifact(
         guild_id=guild_id,
         name=form.get("name","").strip(),
         artifact_type=form.get("artifact_type","other"),
         artifact_size=form.get("artifact_size","small"),
         effect_scope=form.get("effect_scope","village"),
-        conquered_at=form.get("conquered_at","").strip(),
-        activated_at=form.get("activated_at","").strip(),
+        conquered_at=conquered_at,
+        activated_at=activated_at,
         current_holder=form.get("current_holder","").strip(),
         current_village=form.get("current_village","").strip(),
         notes=form.get("notes","").strip(),
@@ -17893,14 +17904,24 @@ async def artifact_update(request: Request, guild_id: str, artifact_id: int):
     if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
         return JSONResponse({"error": "forbidden"}, status_code=403)
     form = await request.form()
+    conquered_at = form.get("conquered_at","").strip()
+    activated_at = ""
+    if conquered_at:
+        from datetime import datetime as _dt, timedelta as _td
+        for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S", "%d.%m.%Y %H:%M", "%d.%m.%Y %H:%M:%S"):
+            try:
+                ct = _dt.strptime(conquered_at, fmt)
+                activated_at = (ct + _td(hours=24)).strftime("%Y-%m-%d %H:%M")
+                break
+            except ValueError:
+                continue
     await database.update_artifact(artifact_id, guild_id,
         name=form.get("name","").strip(),
         artifact_type=form.get("artifact_type","other"),
         artifact_size=form.get("artifact_size","small"),
         effect_scope=form.get("effect_scope","village"),
-        conquered_at=form.get("conquered_at","").strip(),
-        activated_at=form.get("activated_at","").strip(),
-        activation_override=form.get("activation_override","").strip(),
+        conquered_at=conquered_at,
+        activated_at=activated_at,
         current_holder=form.get("current_holder","").strip(),
         current_village=form.get("current_village","").strip(),
         status=form.get("status","active"),

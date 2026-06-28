@@ -384,15 +384,10 @@ body.bulk-mode .art-card { padding-left:2rem; cursor:pointer; }
           <label>Alliance</label>
           <input id="add_alliance" name="alliance_name" class="form-control" placeholder="Auto from coords">
         </div>
-        <div class="form-2col" id="dateFields">
-          <div>
-            <label>Conquered At</label>
-            <input name="conquered_at" class="form-control" placeholder="2026-06-05 14:32">
-          </div>
-          <div>
-            <label>Activated At</label>
-            <input name="activated_at" class="form-control" placeholder="2026-06-06 14:32">
-          </div>
+        <div id="dateFields">
+          <label>Conquered At</label>
+          <input name="conquered_at" class="form-control" placeholder="2026-06-28 14:32">
+          <div style="font-size:.6rem;color:var(--text-muted);margin-top:.15rem;">Activation = conquered + 24h (auto-calculated)</div>
         </div>
         <div>
           <label>Notes</label>

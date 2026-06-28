@@ -101,10 +101,13 @@
       <div style="font-size:.9rem;font-weight:600;">{{ artifact.conquered_at or '—' }}</div>
     </div>
     <div class="section-card" style="padding:.9rem 1rem;margin:0;">
-      <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:.3rem;">Activated (24h after conquest)</div>
+      <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:.3rem;">Activation (conquered + 24h)</div>
       <div style="font-size:.9rem;font-weight:600;" id="activationDisplay">
-        {{ artifact.activation_override or artifact.activated_at or '—' }}
+        {{ artifact.activated_at or '—' }}
       </div>
+      {% if artifact.activated_at %}
+      <div id="activationCountdown" style="font-size:.72rem;margin-top:.2rem;" data-activation="{{ artifact.activated_at }}"></div>
+      {% endif %}
     </div>
   </div>
 
@@ -484,19 +487,10 @@
             </select>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
-          <div>
-            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Conquered at</label>
-            <input name="conquered_at" class="form-control" value="{{ artifact.conquered_at }}">
-          </div>
-          <div>
-            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Activated at (auto)</label>
-            <input name="activated_at" class="form-control" value="{{ artifact.activated_at }}">
-          </div>
-        </div>
         <div>
-          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Override activation time</label>
-          <input name="activation_override" class="form-control" value="{{ artifact.activation_override }}" placeholder="Manual activation time">
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.3rem;">Conquered at</label>
+          <input name="conquered_at" class="form-control" value="{{ artifact.conquered_at }}">
+          <div style="font-size:.65rem;color:var(--text-muted);margin-top:.15rem;">Activation = conquered + 24h (auto-calculated)</div>
         </div>
         <!-- Coordinates -->
         <div>
@@ -870,6 +864,27 @@ async function stopRotation() {
   tick();
 })();
 {% endif %}
+
+// ── Activation countdown ─────────────────────────────────────────────────────
+(function() {
+  const el = document.getElementById('activationCountdown');
+  if (!el) return;
+  const raw = el.dataset.activation;
+  if (!raw) return;
+  const actTime = new Date(raw.replace(' ', 'T')).getTime();
+  if (isNaN(actTime)) return;
+  function tick() {
+    const diff = actTime - Date.now();
+    if (diff <= 0) {
+      el.innerHTML = '<span style="color:#4ade80;font-weight:700;">✅ Active now</span>';
+      return;
+    }
+    const h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000);
+    el.innerHTML = `<span style="color:#f59e0b;">⏳ Activates in ${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s</span>`;
+    setTimeout(tick, 1000);
+  }
+  tick();
+})();
 
 // ── Confirm handoff ───────────────────────────────────────────────────────────
 function openConfirmModal(hid, fromPlayer, toPlayer) {
