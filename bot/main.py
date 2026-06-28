@@ -1841,6 +1841,35 @@ async def handle_archive_rotation_channel(request: aiohttp_web.Request) -> aioht
         return aiohttp_web.json_response({"ok": False, "error": str(e)})
 
 
+async def handle_dm_invite(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    data = await request.json()
+    discord_id = data.get("discord_id", "")
+    invite_url = data.get("invite_url", "")
+    player_name = data.get("player_name", "")
+    guild_name = data.get("guild_name", "")
+    if not discord_id or not invite_url:
+        return aiohttp_web.json_response({"error": "missing fields"}, status=400)
+    try:
+        user = bot.get_user(int(discord_id)) or await bot.fetch_user(int(discord_id))
+        if not user:
+            return aiohttp_web.json_response({"error": "user not found"}, status=404)
+        embed = discord.Embed(
+            title="🏺 Artifact Rotation — Join TravOps",
+            description=(
+                f"Hey **{player_name or user.display_name}**! 👋\n\n"
+                f"You've been added to an artifact rotation in **{guild_name}**.\n"
+                f"To receive turn notifications and coordinate with your team, please join TravOps:\n\n"
+                f"👉 **[Join TravOps]({invite_url})**"
+            ),
+            color=0x6366f1,
+        )
+        embed.set_footer(text="TravOps · Artifact Rotation")
+        await user.send(embed=embed)
+        return aiohttp_web.json_response({"ok": True})
+    except Exception as e:
+        return aiohttp_web.json_response({"error": str(e)}, status=500)
+
+
 async def start_api_server():
     app = aiohttp_web.Application()
     app.router.add_post("/api/create-report-channel", handle_create_report_channel)
@@ -1872,6 +1901,7 @@ async def start_api_server():
     app.router.add_post("/api/delete-artifact-channels", handle_delete_artifact_channels)
     app.router.add_post("/api/create-rotation-channel", handle_create_rotation_channel)
     app.router.add_post("/api/archive-rotation-channel", handle_archive_rotation_channel)
+    app.router.add_post("/api/dm-invite", handle_dm_invite)
     runner = aiohttp_web.AppRunner(app)
     await runner.setup()
     site = aiohttp_web.TCPSite(runner, "0.0.0.0", 7777)

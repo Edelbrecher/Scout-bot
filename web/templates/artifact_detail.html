@@ -606,13 +606,30 @@ const INVITE_URL = {{ invite_url | tojson }};
 const _memberSet = new Set(ALLY_MEMBERS.map(m => m.toLowerCase()));
 function isOnTravops(name) { return _memberSet.has((name||'').toLowerCase()); }
 
-function copyInvite(name) {
+async function copyInvite(name) {
   if (!INVITE_URL) { showToast('No invite link available.', 'error'); return; }
-  navigator.clipboard.writeText(INVITE_URL).then(() => {
-    showToast('📨 Invite link copied — send it to ' + name);
-  }).catch(() => {
-    prompt('Copy this invite link for ' + name + ':', INVITE_URL);
-  });
+  const btn = event?.target;
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const r = await fetch(`/guild/${GUILD_ID}/artifacts/send-invite`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({player_name: name})
+    });
+    const d = await r.json();
+    if (r.ok) {
+      showToast('📨 Invite sent to ' + name + ' via Discord DM');
+    } else if (r.status === 404) {
+      navigator.clipboard.writeText(INVITE_URL).catch(()=>{});
+      showToast('⚠️ ' + name + ' not found on Discord — link copied instead', 'error');
+    } else {
+      navigator.clipboard.writeText(INVITE_URL).catch(()=>{});
+      showToast('⚠️ DM failed — link copied: ' + (d.error||''), 'error');
+    }
+  } catch(e) {
+    navigator.clipboard.writeText(INVITE_URL).catch(()=>{});
+    showToast('⚠️ Bot offline — link copied', 'error');
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '📨 Invite'; }
 }
 window.copyInvite = copyInvite;
 

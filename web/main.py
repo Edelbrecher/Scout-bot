@@ -17569,6 +17569,43 @@ async def artifact_add(request: Request, guild_id: str):
     return RedirectResponse(f"/guild/{guild_id}/artifacts/{aid}?saved=1", status_code=303)
 
 
+@app.post("/guild/{guild_id}/artifacts/send-invite")
+async def artifact_send_invite(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "auth"}, status_code=401)
+    if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    body = await request.json()
+    player_name = str(body.get("player_name", "")).strip()
+    if not player_name:
+        return JSONResponse({"error": "no player name"}, status_code=400)
+    member = await database.find_ally_member_by_name(guild_id, player_name)
+    if not member or not member.get("discord_id"):
+        return JSONResponse({"error": "not_found", "message": f"No Discord user found for '{player_name}'"}, status_code=404)
+    guild = await database.get_guild(guild_id)
+    ag = await database.get_ally_group_for_guild(guild_id)
+    invite_token = ag.get("invite_token", "") if ag else ""
+    base_url = str(request.base_url).rstrip("/")
+    invite_url = f"{base_url}/ally/join/{invite_token}" if invite_token else ""
+    if not invite_url:
+        return JSONResponse({"error": "no invite link"}, status_code=400)
+    import httpx as _httpx
+    try:
+        async with _httpx.AsyncClient(timeout=10) as client:
+            r = await client.post("http://bot:7777/api/dm-invite", json={
+                "discord_id": member["discord_id"],
+                "invite_url": invite_url,
+                "player_name": player_name,
+                "guild_name": guild.get("guild_name", "") if guild else "",
+            })
+            d = r.json()
+            if r.status_code == 200:
+                return JSONResponse({"ok": True})
+            return JSONResponse({"error": d.get("error", "bot error")}, status_code=r.status_code)
+    except Exception as e:
+        return JSONResponse({"error": f"Bot unreachable: {e}"}, status_code=502)
+
+
 @app.get("/guild/{guild_id}/artifacts/rules")
 async def artifact_rules_get(request: Request, guild_id: str):
     session, err = _require_session(request)
