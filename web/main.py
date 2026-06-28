@@ -7722,7 +7722,8 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
     elif preset == "mitglied":
         selected = ["ally_view_rank", "defend_view", "ep_view", "ep_notify", "attack_view", "scout_view", "map_view", "map_meta_view", "res_push_view", "report_view", "treasury_view", "guide_view"]
     perms_str = ",".join(selected)
-    await database.update_ally_role(role_id, ally_group["id"], color=color, permissions=perms_str)
+    discord_role_id = form.get("discord_role_id", "").strip()
+    await database.update_ally_role(role_id, ally_group["id"], color=color, permissions=perms_str, discord_role_id=discord_role_id)
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_updated#rollen", status_code=303)
 
 
@@ -8025,6 +8026,37 @@ async def my_ally_bonus_reorder(request: Request, guild_id: str):
 # Rights Management — inline role assignment per member
 # ---------------------------------------------------------------------------
 
+async def _sync_member_discord_role(guild_id: str, discord_id: str, ally_group_id: int, old_role_id: int | None, new_role_id: int | None):
+    """Add/remove Discord roles when a TravOps ally role changes."""
+    token = os.environ.get("DISCORD_TOKEN", "")
+    if not token:
+        return
+    roles = await database.get_ally_roles(ally_group_id)
+    role_map = {r["id"]: r for r in roles}
+    old_discord_rid = (role_map.get(old_role_id) or {}).get("discord_role_id", "")
+    new_discord_rid = (role_map.get(new_role_id) or {}).get("discord_role_id", "")
+    if old_discord_rid == new_discord_rid:
+        return
+    headers = {"Authorization": f"Bot {token}"}
+    async with httpx.AsyncClient(timeout=10) as client:
+        if old_discord_rid:
+            try:
+                await client.delete(
+                    f"https://discord.com/api/v10/guilds/{guild_id}/members/{discord_id}/roles/{old_discord_rid}",
+                    headers=headers,
+                )
+            except Exception:
+                pass
+        if new_discord_rid:
+            try:
+                await client.put(
+                    f"https://discord.com/api/v10/guilds/{guild_id}/members/{discord_id}/roles/{new_discord_rid}",
+                    headers=headers,
+                )
+            except Exception:
+                pass
+
+
 @app.post("/guild/{guild_id}/my-ally/member/{discord_id}/set-role")
 async def my_ally_set_member_role(request: Request, guild_id: str, discord_id: str):
     ally_group, err = await _require_ally_owner(request, guild_id)
@@ -8032,7 +8064,16 @@ async def my_ally_set_member_role(request: Request, guild_id: str, discord_id: s
     form = await request.form()
     role_id_raw = form.get("role_id", "")
     rid = int(role_id_raw) if role_id_raw and role_id_raw.isdigit() else None
+    # Get old role's discord_role_id before changing
+    members = await database.get_ally_members(ally_group["id"])
+    old_member = next((m for m in members if m["discord_id"] == discord_id), None)
+    old_role_id = old_member.get("role_id") if old_member else None
+
     await database.update_ally_member(ally_group["id"], discord_id, None, None, rid, None)
+
+    # Sync Discord roles
+    asyncio.create_task(_sync_member_discord_role(guild_id, discord_id, ally_group["id"], old_role_id, rid))
+
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=role_set#rechte", status_code=303)
 
 

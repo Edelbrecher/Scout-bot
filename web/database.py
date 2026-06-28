@@ -5375,6 +5375,11 @@ async def _init_ally_tables():
         # ally_roles: add permissions column (comma-separated flags e.g. "ep_notify")
         try:
             await db.execute("ALTER TABLE ally_roles ADD COLUMN permissions TEXT DEFAULT ''")
+            await db.commit()
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE ally_roles ADD COLUMN discord_role_id TEXT DEFAULT ''")
         except Exception:
             pass
         # ally_groups: tq_min (Truppenquote Mindestanforderung in %)
@@ -5572,13 +5577,15 @@ async def create_ally_role(ally_group_id: int, role_name: str, color: str, permi
         return cur.lastrowid
 
 
-async def update_ally_role(role_id: int, ally_group_id: int, color: str | None = None, permissions: str | None = None):
+async def update_ally_role(role_id: int, ally_group_id: int, color: str | None = None, permissions: str | None = None, discord_role_id: str | None = None):
     await _init_ally_tables()
     sets, vals = [], []
     if color is not None:
         sets.append("color=?"); vals.append(color or "#94a3b8")
     if permissions is not None:
         sets.append("permissions=?"); vals.append(permissions or "")
+    if discord_role_id is not None:
+        sets.append("discord_role_id=?"); vals.append(discord_role_id or "")
     if not sets:
         return
     vals += [role_id, ally_group_id]

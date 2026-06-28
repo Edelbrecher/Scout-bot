@@ -1016,6 +1016,19 @@
                     <input type="color" name="color" value="{{ r.color }}"
                            style="width:28px;height:28px;border:1px solid var(--border);border-radius:5px;padding:2px;background:var(--bg-main);cursor:pointer;">
                   </label>
+                  {% if discord_roles %}
+                  <label style="display:flex;align-items:center;gap:.3rem;font-size:.72rem;color:var(--text-muted);" title="Link to Discord role — auto-assigned when member role changes">
+                    🔗 Discord
+                    <select name="discord_role_id" style="font-size:.72rem;padding:.15rem .3rem;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);">
+                      <option value="">— none —</option>
+                      {% for dr in discord_roles %}
+                      {% if dr.name != '@everyone' %}
+                      <option value="{{ dr.id }}" {% if r.discord_role_id|default('',true) == dr.id|string %}selected{% endif %}>{{ dr.name }}</option>
+                      {% endif %}
+                      {% endfor %}
+                    </select>
+                  </label>
+                  {% endif %}
                   <button type="submit" class="btn btn-primary" style="font-size:.8rem;padding:.35rem .9rem;">💾 Save</button>
                   <div style="flex:1;"></div>
                   <button type="button" form="del-role-{{ r.id }}"
