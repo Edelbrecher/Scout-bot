@@ -70,32 +70,28 @@ body.bulk-mode .art-card { padding-left:2rem; cursor:pointer; }
 <div style="max-width:100%;margin:0 auto;padding:0 1.25rem 3rem;">
 
   <!-- Header -->
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.5rem;margin-bottom:.5rem;">
-    <div>
-      <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
-      <h1 style="margin:.2rem 0 0;font-size:1.2rem;">🏺 Artifacts</h1>
-      <p class="subtitle" style="margin:0;font-size:.75rem;">Artifact Management & Rotation Planning</p>
-    </div>
-    <div style="display:flex;gap:.35rem;flex-wrap:wrap;align-items:flex-end;">
-      <a href="/guild/{{ guild.guild_id }}/artifacts/planning" class="btn btn-secondary" style="font-size:.75rem;padding:.3rem .6rem;">Planning</a>
-      <a href="/guild/{{ guild.guild_id }}/artifacts/run-map" class="btn btn-secondary" style="font-size:.75rem;padding:.3rem .6rem;">🗺️ Run Map</a>
-      <a href="/guild/{{ guild.guild_id }}/my-treasury" class="btn btn-secondary" style="font-size:.75rem;padding:.3rem .6rem;">🏛️ My Treasury</a>
-      {% if is_leader %}
-      <a href="/guild/{{ guild.guild_id }}/all-treasuries" class="btn btn-secondary" style="font-size:.75rem;padding:.3rem .6rem;">👥 All Treasuries</a>
-      <button id="bulkToggleBtn" onclick="toggleBulkMode()" class="btn btn-secondary" style="font-size:.75rem;padding:.3rem .6rem;">☑️ Select</button>
-      <button onclick="document.getElementById('addArtModal').classList.add('open')" class="btn btn-primary" style="font-size:.75rem;padding:.3rem .6rem;">+ Artifact</button>
-      {% endif %}
-    </div>
+  <div style="margin-bottom:.4rem;">
+    <a href="/guild/{{ guild.guild_id }}" class="back-link" style="font-size:.72rem;">← {{ guild.guild_name }}</a>
+    <h1 style="margin:.1rem 0 0;font-size:1rem;">🏺 Artifacts</h1>
   </div>
 
-  <!-- Tab bar -->
-  <div style="display:flex;gap:.15rem;margin-bottom:.6rem;border-bottom:1px solid var(--border);padding-bottom:.3rem;">
+  <!-- Unified tab bar -->
+  <div style="display:flex;align-items:center;gap:.15rem;margin-bottom:.5rem;border-bottom:1px solid var(--border);padding-bottom:.25rem;flex-wrap:wrap;">
     <button onclick="artSwitchTab('artifacts')" id="art-tab-artifacts"
-      style="font-size:.7rem;padding:.2rem .55rem;border-radius:5px 5px 0 0;cursor:pointer;font-weight:700;
+      style="font-size:.68rem;padding:.18rem .5rem;border-radius:5px 5px 0 0;cursor:pointer;font-weight:700;
              background:var(--primary);color:#fff;border:1px solid var(--primary);border-bottom:none;">🏺 Artifacts</button>
     <button onclick="artSwitchTab('rules')" id="art-tab-rules"
-      style="font-size:.7rem;padding:.2rem .55rem;border-radius:5px 5px 0 0;cursor:pointer;font-weight:600;
-             background:transparent;color:var(--text-muted);border:1px solid var(--border);border-bottom:none;">📜 Rules of Rotation</button>
+      style="font-size:.68rem;padding:.18rem .5rem;border-radius:5px 5px 0 0;cursor:pointer;font-weight:600;
+             background:transparent;color:var(--text-muted);border:1px solid var(--border);border-bottom:none;">📜 Rules</button>
+    <span style="flex:1;"></span>
+    <a href="/guild/{{ guild.guild_id }}/artifacts/planning" class="btn btn-secondary" style="font-size:.65rem;padding:.18rem .4rem;">Planning</a>
+    <a href="/guild/{{ guild.guild_id }}/artifacts/run-map" class="btn btn-secondary" style="font-size:.65rem;padding:.18rem .4rem;">🗺️ Run Map</a>
+    <a href="/guild/{{ guild.guild_id }}/my-treasury" class="btn btn-secondary" style="font-size:.65rem;padding:.18rem .4rem;">🏛️ Treasury</a>
+    {% if is_leader %}
+    <a href="/guild/{{ guild.guild_id }}/all-treasuries" class="btn btn-secondary" style="font-size:.65rem;padding:.18rem .4rem;">👥 All</a>
+    <button id="bulkToggleBtn" onclick="toggleBulkMode()" class="btn btn-secondary" style="font-size:.65rem;padding:.18rem .4rem;">☑️</button>
+    <button onclick="document.getElementById('addArtModal').classList.add('open')" class="btn btn-primary" style="font-size:.65rem;padding:.18rem .4rem;">+ Add</button>
+    {% endif %}
   </div>
 
   <!-- Tab: Artifacts -->
@@ -280,20 +276,7 @@ body.bulk-mode .art-card { padding-left:2rem; cursor:pointer; }
       </div>
       {% if can_edit_rules %}
       <div id="rulesEditorWrap" style="display:none;">
-        <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
-        <style>
-          #rulesEditor .ql-toolbar { background:var(--bg-card);border-color:var(--border);border-radius:6px 6px 0 0; }
-          #rulesEditor .ql-container { background:rgba(255,255,255,.03);border-color:var(--border);border-radius:0 0 6px 6px;min-height:200px;color:var(--text);font-size:.82rem; }
-          #rulesEditor .ql-editor { min-height:200px; }
-          #rulesEditor .ql-snow .ql-stroke { stroke:var(--text-muted); }
-          #rulesEditor .ql-snow .ql-fill { fill:var(--text-muted); }
-          #rulesEditor .ql-snow .ql-picker-label { color:var(--text-muted); }
-          #rulesEditor .ql-snow .ql-picker-options { background:var(--bg-card);border-color:var(--border); }
-          #rulesEditor .ql-editor.ql-blank::before { color:var(--text-muted);opacity:.5; }
-        </style>
-        <div id="rulesEditor">
-          <div id="rulesQuill"></div>
-        </div>
+        <div id="rulesQuill" style="min-height:200px;"></div>
       </div>
       {% endif %}
     </div>
@@ -587,6 +570,22 @@ function toggleRulesEdit() {
   document.getElementById('rulesEditBtn').textContent = '✕ Cancel';
   document.getElementById('rulesSaveBtn').style.display = '';
   if (!_quill) {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = 'https://cdn.quilljs.com/1.3.7/quill.snow.css';
+    document.head.appendChild(css);
+    const style = document.createElement('style');
+    style.textContent = `
+      #rulesQuill .ql-toolbar{background:var(--bg-card);border-color:var(--border);border-radius:6px 6px 0 0}
+      #rulesQuill .ql-container{background:rgba(255,255,255,.03);border-color:var(--border);border-radius:0 0 6px 6px;min-height:200px;color:var(--text);font-size:.82rem}
+      #rulesQuill .ql-editor{min-height:200px}
+      #rulesQuill .ql-snow .ql-stroke{stroke:var(--text-muted)}
+      #rulesQuill .ql-snow .ql-fill{fill:var(--text-muted)}
+      #rulesQuill .ql-snow .ql-picker-label{color:var(--text-muted)}
+      #rulesQuill .ql-snow .ql-picker-options{background:var(--bg-card);border-color:var(--border)}
+      #rulesQuill .ql-editor.ql-blank::before{color:var(--text-muted);opacity:.5}
+    `;
+    document.head.appendChild(style);
     const script = document.createElement('script');
     script.src = 'https://cdn.quilljs.com/1.3.7/quill.min.js';
     script.onload = function() {
