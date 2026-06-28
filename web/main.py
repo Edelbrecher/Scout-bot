@@ -1641,7 +1641,8 @@ async def _sync_scout_channel_permissions(guild_id: str, allowed_role_ids: str =
             except Exception:
                 continue
 
-            new_overwrites = [ow for ow in existing if ow.get("type") == 1]  # keep member overwrites
+            bot_id = os.environ.get("DISCORD_APP_ID", "")
+            new_overwrites = [ow for ow in existing if ow.get("type") == 1 and ow.get("id") == bot_id]
             new_overwrites.append({"id": guild_id, "type": 0, "allow": "0", "deny": VIEW_CHANNEL_DENY})
             for rid in granted:
                 new_overwrites.append({"id": rid, "type": 0, "allow": VIEW_SEND, "deny": "0"})
@@ -1693,7 +1694,8 @@ async def _sync_defend_channel_permissions(guild_id: str, defend_role_ids: str =
             except Exception:
                 continue
 
-            new_overwrites = [ow for ow in existing if ow.get("type") == 1]
+            requester_id = rec.get("requested_by_id", "")
+            new_overwrites = [ow for ow in existing if ow.get("type") == 1 and ow.get("id") in (requester_id, os.environ.get("DISCORD_APP_ID", ""))]
             new_overwrites.append({"id": guild_id, "type": 0, "allow": "0", "deny": VIEW_CHANNEL_DENY})
             for rid in granted:
                 new_overwrites.append({"id": rid, "type": 0, "allow": VIEW_SEND, "deny": "0"})
