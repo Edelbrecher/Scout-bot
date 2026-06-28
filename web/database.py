@@ -10364,11 +10364,12 @@ async def save_incoming_attacks(guild_id: str, attacks: list[dict],
 
             key = (attacker_player, own_village_name, arrival_time)
 
-            # Count how many with this exact key already exist in DB
+            # Count how many with this exact key already exist in DB for THIS importer
             cnt_cur = await db.execute("""
                 SELECT COUNT(*) FROM incoming_attacks
                 WHERE guild_id=? AND attacker_player=? AND own_village_name=? AND arrival_time=?
-            """, (guild_id, attacker_player, own_village_name, arrival_time))
+                  AND imported_by_discord_id=?
+            """, (guild_id, attacker_player, own_village_name, arrival_time, imported_by_discord_id))
             existing_count = (await cnt_cur.fetchone())[0]
 
             # How many are we allowed to insert for this key?
