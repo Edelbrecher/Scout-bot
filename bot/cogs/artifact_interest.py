@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from bot import database
+import database
 
 PRIO_LABELS = {"high": "🔴 High", "mid": "🟡 Mid", "low": "🟢 Low"}
 PRIO_COLORS = {"high": discord.ButtonStyle.danger, "mid": discord.ButtonStyle.secondary, "low": discord.ButtonStyle.success}
