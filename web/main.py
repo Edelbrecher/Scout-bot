@@ -2808,7 +2808,7 @@ async def toggle_role(request: Request, guild_id: str, role_id: str, field: str 
     if err: return JSONResponse({"error": "unauthorized"}, status_code=403)
     err = _require_guild(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
-    if field not in {"allowed_role_ids", "res_manager_role_ids", "private_channel_role_ids", "defend_role_ids", "archive_role_ids", "res_push_view_role_ids", "scout_view_role_ids"}:
+    if field not in {"allowed_role_ids", "res_manager_role_ids", "private_channel_role_ids", "defend_role_ids", "archive_role_ids", "res_push_view_role_ids", "scout_view_role_ids", "artifact_rules_role_ids"}:
         return JSONResponse({"error": "invalid field"}, status_code=400)
     if not SNOWFLAKE_RE.match(role_id):
         return JSONResponse({"error": "invalid role_id"}, status_code=400)
@@ -16603,6 +16603,19 @@ def _is_leader(session: dict, guild_id: str) -> bool:
     return False
 
 
+async def _user_has_role_field(session: dict, guild_id: str, field: str) -> bool:
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return False
+    role_ids = {r.strip() for r in (guild.get(field) or "").split(",") if r.strip()}
+    if not role_ids:
+        return False
+    for g in (session.get("guilds") or []):
+        if isinstance(g, dict) and str(g.get("id")) == guild_id:
+            return bool(role_ids & {str(r) for r in (g.get("roles") or [])})
+    return False
+
+
 async def _artifact_access(request: Request, guild_id: str):
     """Returns (session, None) or (None, error_response)."""
     session, err = _require_session(request)
@@ -17505,6 +17518,7 @@ async def artifacts_page(request: Request, guild_id: str):
         for a in mg.get("alliances", []):
             if a:
                 own_names.add(a.strip().upper())
+    can_edit_rules = is_leader or await has_perm(request, guild_id, "ally_manage") or await _user_has_role_field(session, guild_id, "artifact_rules_role_ids")
     return templates.TemplateResponse("artifacts.html", {
         "request": request, "guild": guild,
         "artifacts": artifacts, "is_leader": is_leader,
@@ -17512,6 +17526,7 @@ async def artifacts_page(request: Request, guild_id: str):
         "artifact_type_labels": ARTIFACT_TYPE_LABELS,
         "saved": saved,
         "own_alliance_names": own_names,
+        "can_edit_rules": can_edit_rules,
     })
 
 
@@ -17552,6 +17567,26 @@ async def artifact_add(request: Request, guild_id: str):
         is_target=1 if form.get("is_target") else 0,
     )
     return RedirectResponse(f"/guild/{guild_id}/artifacts/{aid}?saved=1", status_code=303)
+
+
+@app.get("/guild/{guild_id}/artifacts/rules")
+async def artifact_rules_get(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "auth"}, status_code=401)
+    content = await database.get_setting(f"artifact_rules:{guild_id}") or ""
+    return JSONResponse({"content": content})
+
+
+@app.post("/guild/{guild_id}/artifacts/rules")
+async def artifact_rules_save(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"error": "auth"}, status_code=401)
+    if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage") or _user_has_role_field(session, guild_id, "artifact_rules_role_ids")):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    body = await request.json()
+    content = str(body.get("content", ""))
+    await database.set_setting(f"artifact_rules:{guild_id}", content)
+    return JSONResponse({"ok": True})
 
 
 def _compute_artifact_stats(artifact: dict, handoffs: list[dict]) -> dict:
