@@ -17580,8 +17580,7 @@ async def artifact_send_invite(request: Request, guild_id: str):
     if not player_name:
         return JSONResponse({"error": "no player name"}, status_code=400)
     member = await database.find_ally_member_by_name(guild_id, player_name)
-    if not member or not member.get("discord_id"):
-        return JSONResponse({"error": "not_found", "message": f"No Discord user found for '{player_name}'"}, status_code=404)
+    discord_id = member.get("discord_id", "") if member else ""
     guild = await database.get_guild(guild_id)
     ag = await database.get_ally_group_for_guild(guild_id)
     invite_token = ag.get("invite_token", "") if ag else ""
@@ -17593,7 +17592,8 @@ async def artifact_send_invite(request: Request, guild_id: str):
     try:
         async with _httpx.AsyncClient(timeout=10) as client:
             r = await client.post("http://bot:7777/api/dm-invite", json={
-                "discord_id": member["discord_id"],
+                "discord_id": discord_id,
+                "guild_id": guild_id,
                 "invite_url": invite_url,
                 "player_name": player_name,
                 "guild_name": guild.get("guild_name", "") if guild else "",

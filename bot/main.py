@@ -1847,10 +1847,28 @@ async def handle_dm_invite(request: aiohttp_web.Request) -> aiohttp_web.Response
     invite_url = data.get("invite_url", "")
     player_name = data.get("player_name", "")
     guild_name = data.get("guild_name", "")
-    if not discord_id or not invite_url:
+    guild_id = data.get("guild_id", "")
+    if not invite_url:
         return aiohttp_web.json_response({"error": "missing fields"}, status=400)
     try:
-        user = bot.get_user(int(discord_id)) or await bot.fetch_user(int(discord_id))
+        user = None
+        if discord_id:
+            user = bot.get_user(int(discord_id)) or await bot.fetch_user(int(discord_id))
+        if not user and guild_id and player_name:
+            guild = bot.get_guild(int(guild_id))
+            if guild:
+                name_lower = player_name.lower()
+                for m in guild.members:
+                    if (m.display_name.lower() == name_lower
+                            or m.name.lower() == name_lower
+                            or (m.nick and m.nick.lower() == name_lower)):
+                        user = m
+                        break
+                if not user:
+                    for m in guild.members:
+                        if name_lower in m.display_name.lower() or name_lower in m.name.lower() or (m.nick and name_lower in m.nick.lower()):
+                            user = m
+                            break
         if not user:
             return aiohttp_web.json_response({"error": "user not found"}, status=404)
         embed = discord.Embed(
