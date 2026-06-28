@@ -2841,6 +2841,9 @@ async def toggle_role(request: Request, guild_id: str, role_id: str, field: str 
     if field in ("allowed_role_ids", "private_channel_role_ids"):
         asyncio.create_task(_sync_private_channel_permissions(guild_id, priv_ids, allowed_ids))
 
+    if field in ("res_push_view_role_ids", "res_manager_role_ids"):
+        asyncio.create_task(_sync_scout_channel_permissions(guild_id, allowed_ids))
+
     return JSONResponse({"added": added, "archive_sync": archive_sync_status})
 
 
