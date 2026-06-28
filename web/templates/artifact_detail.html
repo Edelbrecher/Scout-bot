@@ -182,12 +182,16 @@
       {% set has_confirmed = player_handoff and player_handoff.status == 'confirmed' %}
       <div class="rot-row {% if is_current %}current-holder{% elif is_next %}next-holder{% elif has_confirmed %}completed-holder{% endif %}"
            data-pos="{{ r.position }}" data-player="{{ r.player_name }}"
-           data-hold="{{ r.hold_hours }}" data-notify="{{ r.notify_hours }}">
+           data-hold="{{ r.hold_hours }}" data-notify="{{ r.notify_hours }}"
+           data-vx="{{ r.village_x or 0 }}" data-vy="{{ r.village_y or 0 }}">
         {% if is_leader %}<span class="rot-handle">⠿</span>{% endif %}
         <div class="rot-pos">{{ loop.index }}</div>
         <div class="rot-player" style="flex:1;">
           <div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap;">
             {{ r.player_name }}
+            {% if r.village_x or r.village_y %}
+            <span style="font-size:.65rem;color:var(--text-muted);font-family:monospace;">({{ r.village_x }}|{{ r.village_y }})</span>
+            {% endif %}
             {% if is_current %}
               <span class="rot-status" style="color:#4ade80;">🟢 Holding</span>
             {% elif is_next %}
@@ -266,21 +270,28 @@
     {% if is_leader %}
     <div style="margin-top:.75rem;border-top:1px solid var(--border);padding-top:.75rem;">
       <div style="font-size:.75rem;font-weight:600;margin-bottom:.4rem;color:var(--text-muted);">Add Player</div>
-      <div style="display:flex;gap:.5rem;align-items:flex-start;">
-        <div style="flex:1;position:relative;">
-          <input id="newRotPlayer" class="form-control" placeholder="Type to search members…" autocomplete="off"
+      <div style="display:flex;gap:.4rem;align-items:flex-start;flex-wrap:wrap;">
+        <div style="flex:1;min-width:120px;position:relative;">
+          <input id="newRotPlayer" class="form-control" placeholder="Player name…" autocomplete="off"
                  oninput="filterMemberSuggest()" onfocus="filterMemberSuggest()"
                  onkeydown="rotInputKey(event)" style="width:100%;box-sizing:border-box;">
           <div id="memberSuggest" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;
                background:var(--bg-card);border:1px solid var(--border);border-radius:8px;margin-top:.2rem;
                max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4);"></div>
         </div>
-        <input id="newHoldHours" class="form-control" type="number" value="48" min="1" placeholder="h" style="width:65px;" title="Hold time in hours">
-        <input id="newNotifyHours" class="form-control" type="number" value="6" min="1" placeholder="🔔" style="width:55px;" title="Notify X h before">
-        <button onclick="addRotPlayer()" class="btn btn-secondary" style="padding:.4rem .75rem;font-size:.85rem;">+</button>
+        <div style="display:flex;gap:.2rem;align-items:center;">
+          <input id="newRotX" class="form-control" type="number" placeholder="X" style="width:55px;" title="Village X coord" oninput="rotCoordsLookup()">
+          <span style="color:var(--text-muted);font-size:.7rem;">|</span>
+          <input id="newRotY" class="form-control" type="number" placeholder="Y" style="width:55px;" title="Village Y coord" oninput="rotCoordsLookup()">
+          <button type="button" onclick="rotCoordsLookup()" class="btn btn-secondary" style="padding:.3rem .4rem;font-size:.7rem;" title="Lookup village">🔍</button>
+        </div>
+        <input id="newHoldHours" class="form-control" type="number" value="48" min="1" placeholder="h" style="width:55px;" title="Hold time (hours)">
+        <input id="newNotifyHours" class="form-control" type="number" value="6" min="1" placeholder="🔔" style="width:50px;" title="Notify hours before">
+        <button onclick="addRotPlayer()" class="btn btn-secondary" style="padding:.35rem .65rem;font-size:.82rem;">+</button>
       </div>
-      <div style="font-size:.68rem;color:var(--text-muted);margin-top:.3rem;">
-        Pick a member from the list or type any name manually · Hold time (h) · Notify (h before)
+      <div id="rotLookupInfo" style="display:none;margin-top:.25rem;padding:.25rem .5rem;background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);border-radius:5px;font-size:.7rem;"></div>
+      <div style="font-size:.65rem;color:var(--text-muted);margin-top:.25rem;">
+        Player · Village coords (auto-fills player name) · Hold time (h) · Notify (h before)
       </div>
     </div>
     {% endif %}
@@ -629,6 +640,30 @@ async function copyInvite(name) {
 }
 window.copyInvite = copyInvite;
 
+let _rotLookupTimer = null;
+function rotCoordsLookup() {
+  clearTimeout(_rotLookupTimer);
+  _rotLookupTimer = setTimeout(async function() {
+    const x = parseInt(document.getElementById('newRotX')?.value);
+    const y = parseInt(document.getElementById('newRotY')?.value);
+    const info = document.getElementById('rotLookupInfo');
+    if (isNaN(x) || isNaN(y) || !info) return;
+    try {
+      const r = await fetch(`/guild/${GUILD_ID}/artifacts/api/village-lookup?x=${x}&y=${y}`);
+      const d = await r.json();
+      if (!d.found) {
+        info.style.display = 'block';
+        info.innerHTML = `<span style="color:#f87171;">⚠️ No village at (${x}|${y})</span>`;
+        return;
+      }
+      const playerEl = document.getElementById('newRotPlayer');
+      if (playerEl && !playerEl.value) playerEl.value = d.player_name || '';
+      info.style.display = 'block';
+      info.innerHTML = `📍 <strong>${d.village_name||'?'}</strong> <span style="color:var(--text-muted);">(${x}|${y})</span> · 👤 ${d.player_name||'?'}${d.alliance_name ? ' · ['+d.alliance_name+']' : ''}`;
+    } catch(e) { console.warn('rot lookup failed', e); }
+  }, 500);
+}
+
 // ── Rotation ─────────────────────────────────────────────────────────────────
 
 {% if is_leader %}
@@ -724,7 +759,8 @@ function addRotPlayer() {
   }
   const hold   = document.getElementById('newHoldHours').value || 48;
   const notify = document.getElementById('newNotifyHours').value || 6;
-  // Remove the "No rotation configured" placeholder if present
+  const vx = parseInt(document.getElementById('newRotX').value) || 0;
+  const vy = parseInt(document.getElementById('newRotY').value) || 0;
   const placeholder = rotList.querySelector('p');
   if (placeholder) placeholder.remove();
   const div = document.createElement('div');
@@ -732,7 +768,10 @@ function addRotPlayer() {
   div.dataset.player = name;
   div.dataset.hold   = hold;
   div.dataset.notify = notify;
+  div.dataset.vx = vx;
+  div.dataset.vy = vy;
   const pos = rotList.querySelectorAll('.rot-row').length + 1;
+  const coordsLabel = (vx||vy) ? `<span style="font-size:.65rem;color:var(--text-muted);font-family:monospace;">(${vx}|${vy})</span>` : '';
   let warnBadge = '';
   if (!isOnTravops(name)) {
     warnBadge = `<span class="not-on-travops" data-tip="Not on TravOps — won't receive DMs" style="font-size:.66rem;font-weight:700;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:8px;padding:1px 7px;">⚠️ not on TravOps</span>`;
@@ -742,12 +781,15 @@ function addRotPlayer() {
   }
   div.innerHTML = `<span class="rot-handle">⠿</span>
     <div class="rot-pos">${pos}</div>
-    <div class="rot-player"><div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap;">${_escHtml(name)} <span class="rot-status" style="color:var(--text-muted);">⬜ Upcoming</span> ${warnBadge}</div></div>
+    <div class="rot-player"><div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap;">${_escHtml(name)} ${coordsLabel} <span class="rot-status" style="color:var(--text-muted);">⬜ Upcoming</span> ${warnBadge}</div></div>
     <div class="rot-hours"><div>⏱ ${hold}h hold</div><div>🔔 ${notify}h before</div></div>
     <button onclick="removeRotPlayer(this)" style="background:none;border:none;color:#f87171;cursor:pointer;padding:.2rem .3rem;font-size:1rem;" title="Remove">✕</button>`;
   attachDrag(div);
   rotList.appendChild(div);
   document.getElementById('newRotPlayer').value = '';
+  document.getElementById('newRotX').value = '';
+  document.getElementById('newRotY').value = '';
+  document.getElementById('rotLookupInfo').style.display = 'none';
   document.getElementById('memberSuggest').style.display = 'none';
   document.getElementById('saveRotBtn').style.display = 'inline-block';
 }
@@ -765,6 +807,8 @@ async function saveRotation() {
     player_name:  r.dataset.player,
     hold_hours:   parseInt(r.dataset.hold) || 48,
     notify_hours: parseInt(r.dataset.notify) || 6,
+    village_x:    parseInt(r.dataset.vx) || 0,
+    village_y:    parseInt(r.dataset.vy) || 0,
   }));
   const res = await fetch(`/guild/${GUILD_ID}/artifacts/${ART_ID}/rotation/save`, {
     method: 'POST', headers: {'Content-Type':'application/json'},

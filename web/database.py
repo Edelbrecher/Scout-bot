@@ -12634,6 +12634,12 @@ async def _init_artifact_tables():
                 UNIQUE(artifact_id, position)
             )
         """)
+        for col in ["village_x INTEGER DEFAULT 0", "village_y INTEGER DEFAULT 0"]:
+            try:
+                await db.execute(f"ALTER TABLE artifact_rotation_players ADD COLUMN {col}")
+                await db.commit()
+            except Exception:
+                pass
         # Timeline of handoffs
         await db.execute("""
             CREATE TABLE IF NOT EXISTS artifact_handoffs (
@@ -13329,10 +13335,11 @@ async def save_rotation(artifact_id: int, guild_id: str, players: list[dict]) ->
         for i, p in enumerate(players):
             await db.execute("""
                 INSERT INTO artifact_rotation_players
-                  (artifact_id, guild_id, position, player_name, hold_hours, notify_hours)
-                VALUES (?,?,?,?,?,?)
+                  (artifact_id, guild_id, position, player_name, hold_hours, notify_hours, village_x, village_y)
+                VALUES (?,?,?,?,?,?,?,?)
             """, (artifact_id, guild_id, i, p.get("player_name",""),
-                  int(p.get("hold_hours", 48)), int(p.get("notify_hours", 6))))
+                  int(p.get("hold_hours", 48)), int(p.get("notify_hours", 6)),
+                  int(p.get("village_x", 0) or 0), int(p.get("village_y", 0) or 0)))
         await db.commit()
     return True
 
