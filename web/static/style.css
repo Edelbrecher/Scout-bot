@@ -36,8 +36,8 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: var(--bg);
   color: var(--text);
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: 13px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -83,8 +83,8 @@ code {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 2rem;
-  height: 56px;
+  padding: 0 1.25rem;
+  height: 44px;
   background: #111214;
   border-bottom: 1px solid var(--border);
   position: sticky;
@@ -93,16 +93,16 @@ code {
 }
 
 .nav-brand {
-  font-size: 1.1rem;
+  font-size: .95rem;
   font-weight: 700;
   color: var(--text);
 }
 
-.nav-links { display: flex; gap: 1.5rem; }
-.nav-links a { color: var(--text-muted); font-size: 0.9rem; }
+.nav-links { display: flex; gap: 1rem; }
+.nav-links a { color: var(--text-muted); font-size: 0.78rem; }
 .nav-links a:hover { color: var(--text); text-decoration: none; }
 
-.nav-links-extra { display: flex; align-items: center; gap: 1.5rem; }
+.nav-links-extra { display: flex; align-items: center; gap: 1rem; }
 
 /* Hamburger toggle for the secondary nav items — hidden on desktop */
 .nav-hamburger {
@@ -222,7 +222,7 @@ body.op-page main { padding: 0 !important; }
 /* ── Guild Sidebar ── */
 #guild-sidebar {
   position: fixed;
-  top: 56px;
+  top: 44px;
   left: 0;
   bottom: 0;
   width: 224px;
@@ -586,8 +586,8 @@ body.sidebar-collapsed .gs-submenu-toggle { justify-content: center; }
   }
 }
 
-.page-header { margin-bottom: 1.5rem; }
-.page-header h1 { font-size: 1.6rem; margin-bottom: .25rem; }
+.page-header { margin-bottom: .75rem; }
+.page-header h1 { font-size: 1.15rem; margin-bottom: .15rem; }
 
 .back-link {
   display: inline-block;
@@ -597,7 +597,7 @@ body.sidebar-collapsed .gs-submenu-toggle { justify-content: center; }
 }
 .back-link:hover { color: var(--text); text-decoration: none; }
 
-.subtitle { color: var(--text-muted); font-size: 0.9rem; }
+.subtitle { color: var(--text-muted); font-size: 0.78rem; }
 
 .grid-2 {
   display: grid;
@@ -619,11 +619,11 @@ body.sidebar-collapsed .gs-submenu-toggle { justify-content: center; }
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.5rem;
+  padding: 1rem;
   box-shadow: var(--shadow);
 }
 
-.card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: var(--text); letter-spacing: -.01em; }
+.card h2 { font-size: .9rem; font-weight: 600; margin-bottom: .65rem; color: var(--text); letter-spacing: -.01em; }
 
 .mt-1 { margin-top: 1rem; }
 
@@ -644,7 +644,7 @@ body.sidebar-collapsed .gs-submenu-toggle { justify-content: center; }
 .login-card h1 { font-size: 1.5rem; margin-bottom: .25rem; }
 
 /* ── Forms ── */
-.form-group { margin-bottom: 1rem; text-align: left; }
+.form-group { margin-bottom: .65rem; text-align: left; }
 
 label {
   display: block;
@@ -681,11 +681,11 @@ input:focus { border-color: var(--primary); }
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: .4rem;
-  padding: .55rem 1.2rem;
+  gap: .3rem;
+  padding: .35rem .8rem;
   border: none;
   border-radius: var(--radius);
-  font-size: 0.9rem;
+  font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
   transition: background .15s;
