@@ -2960,7 +2960,7 @@ function _vmDraw() {
     _vm.offX=(W-(maxX-minX)*_vm.scale)/2-minX*_vm.scale;
     _vm.offY=(H-(maxY-minY)*_vm.scale)/2-minY*_vm.scale;
   }
-  const tx=(x,y)=>({sx:x*_vm.scale+_vm.offX,sy:y*_vm.scale+_vm.offY});
+  const tx=(x,y)=>({sx:x*_vm.scale+_vm.offX,sy:-y*_vm.scale+_vm.offY});
 
   // World border + grid
   const{sx:bx0,sy:by0}=tx(-200,-200),{sx:bx1,sy:by1}=tx(200,200);
@@ -3024,8 +3024,8 @@ function _vmDraw() {
     const tip=document.getElementById('vmTooltip');if(!tip)return;
     const mx=e.offsetX,my=e.offsetY;let hit=null;
     for(const a of _vmData){
-      if(a.own_village_x!=null){const sx=a.own_village_x*_vm.scale+_vm.offX,sy=a.own_village_y*_vm.scale+_vm.offY;if(Math.abs(sx-mx)<10&&Math.abs(sy-my)<10){hit={name:a.own_village_name,x:a.own_village_x,y:a.own_village_y,type:'def'};break;}}
-      if(a.attacker_x!=null){const sx=a.attacker_x*_vm.scale+_vm.offX,sy=a.attacker_y*_vm.scale+_vm.offY;if(Math.abs(sx-mx)<10&&Math.abs(sy-my)<10){hit={name:a.attacker_player,x:a.attacker_x,y:a.attacker_y,type:'atk'};break;}}
+      if(a.own_village_x!=null){const sx=a.own_village_x*_vm.scale+_vm.offX,sy=-a.own_village_y*_vm.scale+_vm.offY;if(Math.abs(sx-mx)<10&&Math.abs(sy-my)<10){hit={name:a.own_village_name,x:a.own_village_x,y:a.own_village_y,type:'def'};break;}}
+      if(a.attacker_x!=null){const sx=a.attacker_x*_vm.scale+_vm.offX,sy=-a.attacker_y*_vm.scale+_vm.offY;if(Math.abs(sx-mx)<10&&Math.abs(sy-my)<10){hit={name:a.attacker_player,x:a.attacker_x,y:a.attacker_y,type:'atk'};break;}}
     }
     if(hit){tip.style.display='block';tip.style.left=(mx+12)+'px';tip.style.top=(my-8)+'px';tip.innerHTML=`<strong>${escHtml(hit.name)}</strong><br>(${hit.x}/${hit.y})`;}
     else tip.style.display='none';
@@ -3079,7 +3079,7 @@ function _drawAttackMap() {
     s.offY  = (H - (maxY - minY) * s.scale) / 2 - minY * s.scale;
   }
 
-  const toScreen = (x, y) => ({ sx: x * s.scale + s.offX, sy: y * s.scale + s.offY });
+  const toScreen = (x, y) => ({ sx: x * s.scale + s.offX, sy: -y * s.scale + s.offY });
 
   // Background
   ctx.fillStyle = '#2d5a1e';

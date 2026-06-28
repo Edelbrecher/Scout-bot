@@ -511,7 +511,7 @@ function _amRender() {
     _am.offX = (W-(maxX-minX)*_am.scale)/2 - minX*_am.scale;
     _am.offY = (H-(maxY-minY)*_am.scale)/2 - minY*_am.scale;
   }
-  const tx = (x,y) => ({sx:x*_am.scale+_am.offX, sy:y*_am.scale+_am.offY});
+  const tx = (x,y) => ({sx:x*_am.scale+_am.offX, sy:-y*_am.scale+_am.offY});
 
   // World border (-200..200)
   const{sx:bx0,sy:by0}=tx(-200,-200),{sx:bx1,sy:by1}=tx(200,200);
@@ -622,8 +622,8 @@ window.shareAllyMap = async function(btn) {
     const data=filtered.filter(a=>{const dk=a.imported_by_name||a.own_village_name;return!_amHiddenDef.has(dk)&&!_amHiddenAtk.has(a.attacker_player);});
     let hit=null;
     for(const a of data){
-      if(a.own_village_x!=null){const{sx,sy}={sx:a.own_village_x*_am.scale+_am.offX,sy:a.own_village_y*_am.scale+_am.offY};if(Math.abs(sx-mx)<8&&Math.abs(sy-my)<8){hit={type:'def',name:a.own_village_name,x:a.own_village_x,y:a.own_village_y};break;}}
-      if(a.attacker_x!=null){const{sx,sy}={sx:a.attacker_x*_am.scale+_am.offX,sy:a.attacker_y*_am.scale+_am.offY};if(Math.abs(sx-mx)<8&&Math.abs(sy-my)<8){hit={type:'atk',name:a.attacker_player,x:a.attacker_x,y:a.attacker_y};break;}}
+      if(a.own_village_x!=null){const{sx,sy}={sx:a.own_village_x*_am.scale+_am.offX,sy:-a.own_village_y*_am.scale+_am.offY};if(Math.abs(sx-mx)<8&&Math.abs(sy-my)<8){hit={type:'def',name:a.own_village_name,x:a.own_village_x,y:a.own_village_y};break;}}
+      if(a.attacker_x!=null){const{sx,sy}={sx:a.attacker_x*_am.scale+_am.offX,sy:-a.attacker_y*_am.scale+_am.offY};if(Math.abs(sx-mx)<8&&Math.abs(sy-my)<8){hit={type:'atk',name:a.attacker_player,x:a.attacker_x,y:a.attacker_y};break;}}
     }
     if(hit){tip.style.display='block';tip.style.left=(mx+12)+'px';tip.style.top=(my-8)+'px';tip.innerHTML=`<strong>${escHtml(hit.name)}</strong><br><span style="color:var(--text-muted);">(${hit.x}/${hit.y})</span>`;}
     else{tip.style.display='none';}

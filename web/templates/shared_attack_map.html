@@ -50,7 +50,7 @@ function draw(){
   const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y);
   const mn={x:Math.min(...xs)-5,y:Math.min(...ys)-5},mx={x:Math.max(...xs)+5,y:Math.max(...ys)+5};
   if(S.scale===0){const sx=(W-60)/(mx.x-mn.x||1),sy=(H-60)/(mx.y-mn.y||1);S.scale=Math.min(sx,sy);S.offX=(W-(mx.x-mn.x)*S.scale)/2-mn.x*S.scale;S.offY=(H-(mx.y-mn.y)*S.scale)/2-mn.y*S.scale}
-  const tx=(x,y)=>({sx:x*S.scale+S.offX,sy:y*S.scale+S.offY});
+  const tx=(x,y)=>({sx:x*S.scale+S.offX,sy:-y*S.scale+S.offY});
   const{sx:bx0,sy:by0}=tx(-200,-200),{sx:bx1,sy:by1}=tx(200,200);
   ctx.strokeStyle='rgba(255,255,255,.12)';ctx.lineWidth=1.5;ctx.strokeRect(bx0,by1,bx1-bx0,by0-by1);
   const gS=S.scale>=3?10:S.scale>=1?50:100;
@@ -91,8 +91,8 @@ c.addEventListener('mousemove',e=>{
   if(S.drag){S.offX+=e.offsetX-S.lx;S.offY+=e.offsetY-S.ly;S.lx=e.offsetX;S.ly=e.offsetY;draw();return}
   const tip=document.getElementById('tip'),mx=e.offsetX,my=e.offsetY;let hit=null;
   D.forEach(a=>{if(hit)return;
-    if(a.dx!=null){const sx=a.dx*S.scale+S.offX,sy=a.dy*S.scale+S.offY;if(Math.abs(sx-mx)<10&&Math.abs(sy-my)<10)hit={n:a.dn,x:a.dx,y:a.dy}}
-    if(a.ax!=null){const sx=a.ax*S.scale+S.offX,sy=a.ay*S.scale+S.offY;if(Math.abs(sx-mx)<10&&Math.abs(sy-my)<10)hit={n:a.ap,x:a.ax,y:a.ay}}
+    if(a.dx!=null){const sx=a.dx*S.scale+S.offX,sy=-a.dy*S.scale+S.offY;if(Math.abs(sx-mx)<10&&Math.abs(sy-my)<10)hit={n:a.dn,x:a.dx,y:a.dy}}
+    if(a.ax!=null){const sx=a.ax*S.scale+S.offX,sy=-a.ay*S.scale+S.offY;if(Math.abs(sx-mx)<10&&Math.abs(sy-my)<10)hit={n:a.ap,x:a.ax,y:a.ay}}
   });
   if(hit){tip.style.display='block';tip.style.left=(mx+12)+'px';tip.style.top=(mx+30)+'px';tip.innerHTML='<strong>'+hit.n+'</strong><br>('+hit.x+'/'+hit.y+')'}
   else tip.style.display='none';
