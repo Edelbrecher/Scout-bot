@@ -49,7 +49,7 @@ function draw(){
   if(!pts.length){ctx.fillStyle='#94a3b8';ctx.font='14px sans-serif';ctx.textAlign='center';ctx.fillText('No data',W/2,H/2);return}
   const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y);
   const mn={x:Math.min(...xs)-5,y:Math.min(...ys)-5},mx={x:Math.max(...xs)+5,y:Math.max(...ys)+5};
-  if(S.scale===0){const sx=(W-60)/(mx.x-mn.x||1),sy=(H-60)/(mx.y-mn.y||1);S.scale=Math.min(sx,sy);S.offX=(W-(mx.x-mn.x)*S.scale)/2-mn.x*S.scale;S.offY=(H-(mx.y-mn.y)*S.scale)/2-mn.y*S.scale}
+  if(S.scale===0){S.scale=Math.min((W-60)/(mx.x-mn.x||1),(H-60)/(mx.y-mn.y||1));S.offX=W/2-((mn.x+mx.x)/2)*S.scale;S.offY=H/2+((mn.y+mx.y)/2)*S.scale}
   const tx=(x,y)=>({sx:x*S.scale+S.offX,sy:-y*S.scale+S.offY});
   const{sx:bx0,sy:by0}=tx(-200,-200),{sx:bx1,sy:by1}=tx(200,200);
   ctx.strokeStyle='rgba(255,255,255,.12)';ctx.lineWidth=1.5;ctx.strokeRect(bx0,by1,bx1-bx0,by0-by1);

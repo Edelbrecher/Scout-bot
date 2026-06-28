@@ -2955,10 +2955,9 @@ function _vmDraw() {
   const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y);
   const minX=Math.min(...xs)-5,maxX=Math.max(...xs)+5,minY=Math.min(...ys)-5,maxY=Math.max(...ys)+5;
   if (_vm.scale===0) {
-    const sx=(W-60)/(maxX-minX||1),sy=(H-60)/(maxY-minY||1);
-    _vm.scale=Math.min(sx,sy);
-    _vm.offX=(W-(maxX-minX)*_vm.scale)/2-minX*_vm.scale;
-    _vm.offY=(H-(maxY-minY)*_vm.scale)/2-minY*_vm.scale;
+    _vm.scale=Math.min((W-60)/(maxX-minX||1),(H-60)/(maxY-minY||1));
+    _vm.offX=W/2-((minX+maxX)/2)*_vm.scale;
+    _vm.offY=H/2+((minY+maxY)/2)*_vm.scale;
   }
   const tx=(x,y)=>({sx:x*_vm.scale+_vm.offX,sy:-y*_vm.scale+_vm.offY});
 
@@ -3075,8 +3074,8 @@ function _drawAttackMap() {
     const scaleX = (W - 40) / (maxX - minX || 1);
     const scaleY = (H - 40) / (maxY - minY || 1);
     s.scale = Math.min(scaleX, scaleY);
-    s.offX  = (W - (maxX - minX) * s.scale) / 2 - minX * s.scale;
-    s.offY  = (H - (maxY - minY) * s.scale) / 2 - minY * s.scale;
+    s.offX  = W/2 - ((minX+maxX)/2) * s.scale;
+    s.offY  = H/2 + ((minY+maxY)/2) * s.scale;
   }
 
   const toScreen = (x, y) => ({ sx: x * s.scale + s.offX, sy: -y * s.scale + s.offY });

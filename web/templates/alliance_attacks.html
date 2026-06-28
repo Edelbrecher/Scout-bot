@@ -506,10 +506,9 @@ function _amRender() {
   const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
   const minX = Math.min(...xs)-15, maxX = Math.max(...xs)+15, minY = Math.min(...ys)-15, maxY = Math.max(...ys)+15;
   if (_am.scale === 0) {
-    const sx = (W-60)/(maxX-minX||1), sy = (H-60)/(maxY-minY||1);
-    _am.scale = Math.min(sx,sy);
-    _am.offX = (W-(maxX-minX)*_am.scale)/2 - minX*_am.scale;
-    _am.offY = (H-(maxY-minY)*_am.scale)/2 - minY*_am.scale;
+    _am.scale = Math.min((W-60)/(maxX-minX||1), (H-60)/(maxY-minY||1));
+    _am.offX = W/2 - ((minX+maxX)/2)*_am.scale;
+    _am.offY = H/2 + ((minY+maxY)/2)*_am.scale;
   }
   const tx = (x,y) => ({sx:x*_am.scale+_am.offX, sy:-y*_am.scale+_am.offY});
 
