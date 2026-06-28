@@ -53,6 +53,43 @@
     </div>
   </div>
 
+  <!-- Attack Map -->
+  <div style="margin-bottom:.75rem;">
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div onclick="toggleAllyMap()" style="display:flex;align-items:center;justify-content:space-between;padding:.4rem .75rem;cursor:pointer;user-select:none;border-bottom:1px solid var(--border);">
+        <span style="font-size:.78rem;font-weight:700;">🗺️ Attack Map</span>
+        <span id="allyMapArrow" style="font-size:.65rem;color:var(--text-muted);">▶ show</span>
+      </div>
+      <div id="allyMapBody" style="display:none;">
+        <div style="display:flex;flex-wrap:wrap;gap:0;border-bottom:1px solid var(--border);">
+          <!-- Defender chips -->
+          <div style="flex:1;min-width:200px;padding:.35rem .6rem;border-right:1px solid var(--border);">
+            <div style="font-size:.6rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:.2rem;">🟦 Defenders</div>
+            <div id="mapDefChips" style="display:flex;flex-wrap:wrap;gap:.2rem;"></div>
+          </div>
+          <!-- Attacker chips -->
+          <div style="flex:1;min-width:200px;padding:.35rem .6rem;">
+            <div style="font-size:.6rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:.2rem;">🟥 Attackers</div>
+            <div id="mapAtkChips" style="display:flex;flex-wrap:wrap;gap:.2rem;"></div>
+          </div>
+        </div>
+        <div style="position:relative;background:#0d1a0d;overflow:hidden;">
+          <canvas id="allyMapCanvas" style="display:block;width:100%;height:400px;cursor:crosshair;"></canvas>
+          <div id="allyMapTooltip" style="position:absolute;pointer-events:none;display:none;background:rgba(10,15,10,.95);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:.3rem .55rem;font-size:.7rem;z-index:10;max-width:220px;"></div>
+          <div style="position:absolute;bottom:.4rem;right:.4rem;display:flex;gap:.2rem;">
+            <button onclick="_amZoom(1.3)" style="width:24px;height:24px;background:var(--bg-card);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;font-size:.85rem;font-weight:700;">+</button>
+            <button onclick="_amZoom(1/1.3)" style="width:24px;height:24px;background:var(--bg-card);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;font-size:.85rem;font-weight:700;">−</button>
+            <button onclick="_amReset()" style="width:24px;height:24px;background:var(--bg-card);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;font-size:.6rem;">⌂</button>
+          </div>
+          <div style="position:absolute;top:.35rem;left:.35rem;background:rgba(10,15,10,.85);border:1px solid rgba(255,255,255,.1);border-radius:5px;padding:.2rem .4rem;font-size:.6rem;display:flex;gap:.5rem;">
+            <span>🟥 Attacker</span><span>🟦 Defender</span>
+            <span style="color:#f87171;">— real</span><span style="color:#94a3b8;">— fake</span><span style="color:#4ade80;">— support</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Coordination Warning -->
   <div id="coordWarning" style="display:none;margin-bottom:1rem;"></div>
 
@@ -231,6 +268,7 @@ function renderKpi() {
 
 // ── Filter + render ───────────────────────────────────────────────────────────
 
+let filtered = [];
 function applyFiltersAndRender() {
   let attacks = [...allAttacks];
   if (document.getElementById('fOnlyReal').checked)   attacks = attacks.filter(a => (a.fake_score||50) < 60);
@@ -245,6 +283,9 @@ function applyFiltersAndRender() {
       </div>`;
     return;
   }
+
+  filtered = attacks;
+  if (document.getElementById('allyMapBody')?.style.display !== 'none') _amRender();
 
   // Group by defender village
   const villageMap = {};
@@ -399,6 +440,135 @@ function startAutoRefresh() {
     await loadData();
   }, 30000);
 }
+
+// ── Alliance Attack Map ──────────────────────────────────────────────────────
+
+const _am = { scale:0, offX:0, offY:0, drag:false, lx:0, ly:0 };
+let _amHiddenDef = new Set();
+let _amHiddenAtk = new Set();
+
+window.toggleAllyMap = function() {
+  const b = document.getElementById('allyMapBody');
+  const a = document.getElementById('allyMapArrow');
+  if (!b) return;
+  const open = b.style.display !== 'none';
+  b.style.display = open ? 'none' : 'block';
+  if (a) a.textContent = open ? '▶ show' : '▼ hide';
+  if (!open) _amRender();
+};
+
+function _amBuildChips() {
+  const defs = new Map(), atks = new Map();
+  for (const a of filtered) {
+    if (a.own_village_name) {
+      const key = a.imported_by_name || a.own_village_name;
+      defs.set(key, (defs.get(key)||0) + 1);
+    }
+    if (a.attacker_player) atks.set(a.attacker_player, (atks.get(a.attacker_player)||0) + 1);
+  }
+  const chip = (name, count, hidden, toggle) =>
+    `<button onclick="${toggle}('${escHtml(name).replace(/'/g,"\\'")}')"
+      style="font-size:.6rem;padding:.1rem .35rem;border-radius:4px;cursor:pointer;border:1px solid ${hidden?'rgba(255,255,255,.08)':'var(--border)'};
+             background:${hidden?'rgba(255,255,255,.02)':'rgba(99,102,241,.08)'};color:${hidden?'rgba(255,255,255,.2)':'var(--text)'};
+             opacity:${hidden?'.4':'1'};white-space:nowrap;">${escHtml(name)} <span style="color:var(--text-muted);">${count}</span></button>`;
+  document.getElementById('mapDefChips').innerHTML = [...defs].map(([n,c]) => chip(n, c, _amHiddenDef.has(n), '_amToggleDef')).join('');
+  document.getElementById('mapAtkChips').innerHTML = [...atks].map(([n,c]) => chip(n, c, _amHiddenAtk.has(n), '_amToggleAtk')).join('');
+}
+
+window._amToggleDef = function(name) { _amHiddenDef.has(name) ? _amHiddenDef.delete(name) : _amHiddenDef.add(name); _amRender(); };
+window._amToggleAtk = function(name) { _amHiddenAtk.has(name) ? _amHiddenAtk.delete(name) : _amHiddenAtk.add(name); _amRender(); };
+
+function _amRender() {
+  _amBuildChips();
+  const canvas = document.getElementById('allyMapCanvas');
+  if (!canvas) return;
+  const data = filtered.filter(a => {
+    const defKey = a.imported_by_name || a.own_village_name;
+    if (_amHiddenDef.has(defKey)) return false;
+    if (_amHiddenAtk.has(a.attacker_player)) return false;
+    return true;
+  });
+
+  const pts = [];
+  for (const a of data) {
+    if (a.attacker_x != null) pts.push({x:a.attacker_x, y:a.attacker_y});
+    if (a.own_village_x != null) pts.push({x:a.own_village_x, y:a.own_village_y});
+  }
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.clientWidth, H = canvas.clientHeight || 400;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = '#0d1a0d'; ctx.fillRect(0,0,W,H);
+  if (!pts.length) { ctx.fillStyle='#94a3b8'; ctx.font='13px sans-serif'; ctx.textAlign='center'; ctx.fillText('No attacks with coordinates',W/2,H/2); return; }
+
+  const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
+  const minX = Math.min(...xs)-5, maxX = Math.max(...xs)+5, minY = Math.min(...ys)-5, maxY = Math.max(...ys)+5;
+  if (_am.scale === 0) {
+    const sx = (W-40)/(maxX-minX||1), sy = (H-40)/(maxY-minY||1);
+    _am.scale = Math.min(sx,sy);
+    _am.offX = (W-(maxX-minX)*_am.scale)/2 - minX*_am.scale;
+    _am.offY = (H-(maxY-minY)*_am.scale)/2 - minY*_am.scale;
+  }
+  const tx = (x,y) => ({sx:x*_am.scale+_am.offX, sy:y*_am.scale+_am.offY});
+
+  // Grid
+  ctx.strokeStyle='rgba(255,255,255,.04)'; ctx.lineWidth=0.5;
+  for (let gx=Math.floor(minX/10)*10;gx<=maxX;gx+=10){const{sx}=tx(gx,0);ctx.beginPath();ctx.moveTo(sx,0);ctx.lineTo(sx,H);ctx.stroke();}
+  for (let gy=Math.floor(minY/10)*10;gy<=maxY;gy+=10){const{sy}=tx(0,gy);ctx.beginPath();ctx.moveTo(0,sy);ctx.lineTo(W,sy);ctx.stroke();}
+
+  // Arrows
+  for (const a of data) {
+    if (a.attacker_x==null||a.own_village_x==null) continue;
+    const{sx:ax,sy:ay}=tx(a.attacker_x,a.attacker_y);
+    const{sx:dx,sy:dy}=tx(a.own_village_x,a.own_village_y);
+    const isFake=(a.fake_score||50)>=70||a.label==='fake';
+    const isSupp=a.attack_type==='support';
+    const isReal=!isFake&&!isSupp&&(a.fake_score||50)<60;
+    ctx.strokeStyle=isSupp?'#4ade80':isFake?'rgba(148,163,184,.3)':isReal?'rgba(248,113,113,.6)':'rgba(251,191,36,.4)';
+    ctx.lineWidth=isReal?1.5:0.8;
+    ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(dx,dy);ctx.stroke();
+    // Arrowhead
+    const ang=Math.atan2(dy-ay,dx-ax);const hl=6;
+    ctx.beginPath();ctx.moveTo(dx,dy);ctx.lineTo(dx-hl*Math.cos(ang-.4),dy-hl*Math.sin(ang-.4));ctx.moveTo(dx,dy);ctx.lineTo(dx-hl*Math.cos(ang+.4),dy-hl*Math.sin(ang+.4));ctx.stroke();
+  }
+
+  // Nodes
+  const defNodes=new Map(), atkNodes=new Map();
+  for (const a of data) {
+    if (a.own_village_x!=null) { const k=a.own_village_x+','+a.own_village_y; if(!defNodes.has(k)) defNodes.set(k,{x:a.own_village_x,y:a.own_village_y,name:a.own_village_name,count:0}); defNodes.get(k).count++; }
+    if (a.attacker_x!=null) { const k=a.attacker_x+','+a.attacker_y; if(!atkNodes.has(k)) atkNodes.set(k,{x:a.attacker_x,y:a.attacker_y,name:a.attacker_player,count:0}); atkNodes.get(k).count++; }
+  }
+  for (const[,n] of defNodes){const{sx,sy}=tx(n.x,n.y);ctx.fillStyle='#3b82f6';ctx.beginPath();ctx.arc(sx,sy,4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#93c5fd';ctx.font='9px sans-serif';ctx.textAlign='center';ctx.fillText(n.name,sx,sy-7);}
+  for (const[,n] of atkNodes){const{sx,sy}=tx(n.x,n.y);ctx.fillStyle='#ef4444';ctx.beginPath();ctx.arc(sx,sy,3.5,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fca5a5';ctx.font='8px sans-serif';ctx.textAlign='center';ctx.fillText(n.name,sx,sy-6);}
+}
+
+// Map controls
+window._amZoom = function(f) { _am.scale*=f; _amRender(); };
+window._amReset = function() { _am.scale=0; _am.offX=0; _am.offY=0; _amRender(); };
+
+(function(){
+  const c=document.getElementById('allyMapCanvas');if(!c)return;
+  c.addEventListener('mousedown',e=>{_am.drag=true;_am.lx=e.offsetX;_am.ly=e.offsetY;});
+  c.addEventListener('mousemove',e=>{if(!_am.drag)return;_am.offX+=e.offsetX-_am.lx;_am.offY+=e.offsetY-_am.ly;_am.lx=e.offsetX;_am.ly=e.offsetY;_amRender();});
+  c.addEventListener('mouseup',()=>{_am.drag=false;});
+  c.addEventListener('mouseleave',()=>{_am.drag=false;});
+  c.addEventListener('wheel',e=>{e.preventDefault();_amZoom(e.deltaY<0?1.15:1/1.15);},{passive:false});
+  // Tooltip
+  const tip=document.getElementById('allyMapTooltip');
+  c.addEventListener('mousemove',e=>{
+    if(_am.drag||!tip)return;
+    const rect=c.getBoundingClientRect();const mx=e.clientX-rect.left,my=e.clientY-rect.top;
+    const data=filtered.filter(a=>{const dk=a.imported_by_name||a.own_village_name;return!_amHiddenDef.has(dk)&&!_amHiddenAtk.has(a.attacker_player);});
+    let hit=null;
+    for(const a of data){
+      if(a.own_village_x!=null){const{sx,sy}={sx:a.own_village_x*_am.scale+_am.offX,sy:a.own_village_y*_am.scale+_am.offY};if(Math.abs(sx-mx)<8&&Math.abs(sy-my)<8){hit={type:'def',name:a.own_village_name,x:a.own_village_x,y:a.own_village_y};break;}}
+      if(a.attacker_x!=null){const{sx,sy}={sx:a.attacker_x*_am.scale+_am.offX,sy:a.attacker_y*_am.scale+_am.offY};if(Math.abs(sx-mx)<8&&Math.abs(sy-my)<8){hit={type:'atk',name:a.attacker_player,x:a.attacker_x,y:a.attacker_y};break;}}
+    }
+    if(hit){tip.style.display='block';tip.style.left=(mx+12)+'px';tip.style.top=(my-8)+'px';tip.innerHTML=`<strong>${escHtml(hit.name)}</strong><br><span style="color:var(--text-muted);">(${hit.x}/${hit.y})</span>`;}
+    else{tip.style.display='none';}
+  });
+})();
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
