@@ -26,6 +26,12 @@
   background:rgba(0,0,0,.65); padding:0.2rem 0.6rem;
   border-radius:4px; font-size:0.75rem; color:#aaa; font-family:monospace;
 }
+#mapInputToggle {
+  position:absolute; bottom:10px; right:140px;
+  background:rgba(0,0,0,.65); padding:0.15rem 0.45rem;
+  border-radius:4px; font-size:0.8rem; color:#ccc; cursor:pointer; border:1px solid rgba(255,255,255,.15);
+  z-index:5;
+}
 .map-bar { display:flex; gap:0.5rem; flex-wrap:wrap; align-items:flex-end; padding:0.65rem 0.85rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; margin-bottom:0.5rem; }
 .map-bar label { font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px; }
 .map-bar input[type=text],.map-bar input[type=number] { padding:0.35rem 0.55rem; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:5px; font-size:0.82rem; }
@@ -286,6 +292,7 @@
     <div id="mapTooltip"></div>
     <div id="mapStatus">Lade Kartendaten…</div>
     <div id="coordDisplay">—|—</div>
+    <button id="mapInputToggle" onclick="_mapToggleInput(this)">🖱️</button>
   </div>
   <div id="mapResizeHandle" title="Drag to enlarge"></div>
   <p class="hint" style="margin-top:0.4rem; font-size:0.77rem;">Scroll = Zoom &nbsp;·&nbsp; Drag = Pan &nbsp;·&nbsp; Hover = Details &nbsp;·&nbsp; Klick = Account/Spieler/Dorf-Infos &nbsp;·&nbsp; Rechtsklick = Spieler-Dörfer markieren &nbsp;·&nbsp; Double-click = Center &nbsp;·&nbsp; Handle = Resize</p>
@@ -1064,7 +1071,7 @@ canvas.addEventListener('wheel', e => {
   const cx = (e.clientX-rect.left)*(canvas.width/rect.width);
   const cy = (e.clientY-rect.top)*(canvas.height/rect.height);
   const [wx,wy] = canvasToWorld(cx,cy);
-  scale = Math.max(0.3, Math.min(80, scale * (e.deltaY<0?1.18:0.847)));
+  scale = Math.max(0.3, Math.min(80, scale * _mapZoomFactor(e.deltaY)));
   camX = wx-(cx-canvas.width/2)/scale;
   camY = wy+(cy-canvas.height/2)/scale;
   draw();

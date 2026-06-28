@@ -532,6 +532,17 @@ function _amRender() {
     // Arrowhead
     const ang=Math.atan2(dy-ay,dx-ax);const hl=6;
     ctx.beginPath();ctx.moveTo(dx,dy);ctx.lineTo(dx-hl*Math.cos(ang-.4),dy-hl*Math.sin(ang-.4));ctx.moveTo(dx,dy);ctx.lineTo(dx-hl*Math.cos(ang+.4),dy-hl*Math.sin(ang+.4));ctx.stroke();
+    // Travel time label at midpoint
+    if(_am.scale>1.5&&a.arrival_time){
+      const mx2=(ax+dx)/2, my2=(ay+dy)/2;
+      const dist=Math.sqrt(Math.pow(a.attacker_x-a.own_village_x,2)+Math.pow(a.attacker_y-a.own_village_y,2));
+      let lbl=a.arrival_time.slice(11,16)||'';
+      if(dist>0)lbl+=` · ${dist.toFixed(0)}f`;
+      ctx.save();ctx.font='7px sans-serif';ctx.textAlign='center';
+      ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(mx2-ctx.measureText(lbl).width/2-2,my2-5,ctx.measureText(lbl).width+4,10);
+      ctx.fillStyle=isSupp?'#86efac':isFake?'#94a3b8':'#fca5a5';
+      ctx.fillText(lbl,mx2,my2+3);ctx.restore();
+    }
   }
 
   // Nodes
@@ -554,7 +565,16 @@ window._amReset = function() { _am.scale=0; _am.offX=0; _am.offY=0; _amRender();
   c.addEventListener('mousemove',e=>{if(!_am.drag)return;_am.offX+=e.offsetX-_am.lx;_am.offY+=e.offsetY-_am.ly;_am.lx=e.offsetX;_am.ly=e.offsetY;_amRender();});
   c.addEventListener('mouseup',()=>{_am.drag=false;});
   c.addEventListener('mouseleave',()=>{_am.drag=false;});
-  c.addEventListener('wheel',e=>{e.preventDefault();_amZoom(_mapZoomFactor(e.deltaY));},{passive:false});
+  c.addEventListener('wheel',e=>{
+    e.preventDefault();e.stopPropagation();
+    const rect=c.getBoundingClientRect();
+    const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+    const f=_mapZoomFactor(e.deltaY);
+    _am.offX=mx-(mx-_am.offX)*f;
+    _am.offY=my-(my-_am.offY)*f;
+    _am.scale*=f;
+    _amRender();
+  },{passive:false});
   // Tooltip
   const tip=document.getElementById('allyMapTooltip');
   c.addEventListener('mousemove',e=>{
