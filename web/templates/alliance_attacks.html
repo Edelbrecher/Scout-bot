@@ -106,6 +106,10 @@
 </div>
 
 <style>
+@keyframes artPulse {
+  0%,100% { opacity:1; }
+  50% { opacity:.6; }
+}
 .village-block {
   background:var(--bg-card);
   border:1px solid var(--border);
@@ -294,9 +298,17 @@ function applyFiltersAndRender() {
     const key = `${a.own_village_x}|${a.own_village_y}`;
     if (!villageMap[key]) villageMap[key] = {
       name: a.own_village_name, x: a.own_village_x, y: a.own_village_y,
-      owner: a.imported_by_name, attacks: []
+      owner: a.imported_by_name, attacks: [],
+      has_artifact: false, artifact_name: '', artifact_conquest_day: false, artifact_activation_window: false
     };
     villageMap[key].attacks.push(a);
+    if (a.has_artifact) {
+      villageMap[key].has_artifact = true;
+      villageMap[key].artifact_name = a.artifact_name || '';
+      villageMap[key].artifact_type = a.artifact_type || '';
+      if (a.artifact_conquest_day) villageMap[key].artifact_conquest_day = true;
+      if (a.artifact_activation_window) villageMap[key].artifact_activation_window = true;
+    }
   }
 
   // Sort groups
@@ -337,17 +349,41 @@ function applyFiltersAndRender() {
     const threatColor = realCount > 0 ? '#f87171' : '#4ade80';
     const coords = g.x != null ? ` (${g.x}|${g.y})` : '';
 
-    html += `<div class="village-block">
-      <div class="village-block-header">
+    const artBorder = g.has_artifact ? 'border:2px solid rgba(251,191,36,.6);box-shadow:0 0 12px rgba(251,191,36,.15);' : '';
+    const artActivation = g.artifact_activation_window;
+
+    html += `<div class="village-block" style="${artBorder}">
+      <div class="village-block-header" style="${g.has_artifact?'background:rgba(251,191,36,.08);':''}">
         🏰 <span>${escHtml(g.name||'?')}${escHtml(coords)}</span>
-        <span style="font-size:.75rem;color:var(--text-muted);font-weight:400;">von ${escHtml(g.owner||'?')}</span>
+        ${g.has_artifact ? `<span style="font-size:.7rem;font-weight:800;padding:.12rem .5rem;border-radius:8px;
+          background:${artActivation?'rgba(239,68,68,.15)':'rgba(251,191,36,.12)'};
+          border:1px solid ${artActivation?'rgba(239,68,68,.4)':'rgba(251,191,36,.35)'};
+          color:${artActivation?'#f87171':'#fbbf24'};
+          animation:${artActivation?'artPulse 1.5s ease-in-out infinite':'none'};">
+          🏺 ${escHtml(g.artifact_name)} ${artActivation?'⚠️ ACTIVATION WINDOW':''}
+        </span>` : ''}
+        <span style="font-size:.75rem;color:var(--text-muted);font-weight:400;">by ${escHtml(g.owner||'?')}</span>
         <span style="margin-left:auto;display:flex;align-items:center;gap:.5rem;font-size:.78rem;font-weight:400;">
-          ${waves.length} Welle(n) · ${g.attacks.length} Angriff(e)
+          ${waves.length} wave(s) · ${g.attacks.length} attack(s)
           ${realCount > 0
-            ? `<span style="color:#f87171;font-weight:600;">⚠ ${realCount} mögl. Real</span>`
-            : `<span style="color:#4ade80;">✓ Nur Fakes</span>`}
+            ? `<span style="color:#f87171;font-weight:600;">⚠ ${realCount} likely real</span>`
+            : `<span style="color:#4ade80;">✓ Fakes only</span>`}
         </span>
       </div>`;
+
+    if (g.has_artifact && artActivation) {
+      html += `<div style="padding:.5rem .85rem;background:rgba(239,68,68,.08);border-bottom:1px solid rgba(239,68,68,.2);display:flex;align-items:center;gap:.5rem;">
+        <span style="font-size:1.2rem;">🚨</span>
+        <div>
+          <div style="font-size:.78rem;font-weight:700;color:#f87171;">ARTIFACT VILLAGE UNDER ATTACK</div>
+          <div style="font-size:.7rem;color:var(--text-muted);">🏺 ${escHtml(g.artifact_name)} — attacks arrive during the 24h activation window. This artifact is at risk!</div>
+        </div>
+      </div>`;
+    } else if (g.has_artifact) {
+      html += `<div style="padding:.35rem .85rem;background:rgba(251,191,36,.05);border-bottom:1px solid rgba(251,191,36,.15);font-size:.72rem;color:#fbbf24;">
+        🏺 This village holds <strong>${escHtml(g.artifact_name)}</strong> — defend with priority
+      </div>`;
+    }
 
     for (let wi = 0; wi < waves.length; wi++) {
       const waveAttacks = waves[wi];

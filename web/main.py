@@ -6587,6 +6587,47 @@ async def attacks_api_alliance(request: Request, guild_id: str):
             if coords:
                 a["own_village_x"] = coords["x"]
                 a["own_village_y"] = coords["y"]
+    artifacts = await database.get_artifacts(guild_id)
+    active_arts = [a for a in artifacts if not a.get("is_target") and a.get("status") == "active"]
+    if active_arts:
+        from datetime import datetime as _dt, timedelta as _td
+        art_by_coords = {}
+        art_by_village = {}
+        for art in active_arts:
+            if art.get("x") and art.get("y"):
+                art_by_coords[(art["x"], art["y"])] = art
+            if art.get("current_village"):
+                art_by_village[art["current_village"].strip().lower()] = art
+        for a in attacks:
+            vx, vy = a.get("own_village_x"), a.get("own_village_y")
+            vname = (a.get("own_village_name") or "").strip().lower()
+            art = None
+            if vx is not None and vy is not None:
+                art = art_by_coords.get((vx, vy))
+            if not art and vname:
+                art = art_by_village.get(vname)
+            if art:
+                a["has_artifact"] = True
+                a["artifact_name"] = art.get("name", "")
+                a["artifact_type"] = art.get("artifact_type", "")
+                conquered = art.get("conquered_at", "")
+                activated = art.get("activated_at", "")
+                arrival = a.get("arrival_time", "")
+                if conquered and arrival:
+                    try:
+                        for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S", "%d.%m.%Y %H:%M"):
+                            try:
+                                ct = _dt.strptime(conquered, fmt)
+                                break
+                            except ValueError:
+                                ct = None
+                        at = _dt.fromisoformat(arrival.replace("T", " ")[:19]) if arrival else None
+                        if ct and at and ct.date() == at.date():
+                            a["artifact_conquest_day"] = True
+                        if ct and at and at <= ct + _td(hours=24):
+                            a["artifact_activation_window"] = True
+                    except Exception:
+                        pass
     return JSONResponse(attacks)
 
 
