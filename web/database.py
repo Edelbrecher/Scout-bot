@@ -1952,6 +1952,26 @@ async def get_player_from_snapshot(guild_id: str, player_name: str) -> dict | No
         }
 
 
+async def resolve_village_coords(guild_id: str, village_name: str) -> dict | None:
+    """Look up coords for a village by name from the latest map snapshot."""
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT MAX(fetched_at) as latest FROM map_snapshots WHERE guild_id = ?",
+            (guild_id,),
+        ) as cur:
+            row = await cur.fetchone()
+            latest = row["latest"] if row else None
+        if not latest:
+            return None
+        async with db.execute(
+            "SELECT x, y FROM map_snapshots WHERE guild_id = ? AND fetched_at = ? AND village_name = ? LIMIT 1",
+            (guild_id, latest, village_name),
+        ) as cur:
+            row = await cur.fetchone()
+        return {"x": row["x"], "y": row["y"]} if row else None
+
+
 async def get_village_from_snapshot(guild_id: str, x: int, y: int) -> dict | None:
     """Look up a village by exact coords in the latest map snapshot."""
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:

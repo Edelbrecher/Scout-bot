@@ -6565,6 +6565,17 @@ async def attacks_api_alliance(request: Request, guild_id: str):
     session, err = await _attack_access(request, guild_id)
     if err: return err
     attacks = await database.get_incoming_attacks_alliance(guild_id)
+    needs_resolve = [a for a in attacks if a.get("own_village_x") is None and a.get("own_village_name")]
+    if needs_resolve:
+        resolved = {}
+        for a in needs_resolve:
+            vname = a["own_village_name"]
+            if vname not in resolved:
+                resolved[vname] = await database.resolve_village_coords(guild_id, vname)
+            coords = resolved[vname]
+            if coords:
+                a["own_village_x"] = coords["x"]
+                a["own_village_y"] = coords["y"]
     return JSONResponse(attacks)
 
 
