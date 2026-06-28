@@ -379,6 +379,7 @@
               <canvas id="attackMapCanvas" style="display:block;width:100%;height:340px;cursor:crosshair;"></canvas>
               <div id="attackMapTooltip" style="position:absolute;pointer-events:none;display:none;background:rgba(10,15,10,.95);border:1px solid rgba(255,255,255,.15);border-radius:7px;padding:.4rem .65rem;font-size:.76rem;z-index:10;max-width:220px;"></div>
               <div style="position:absolute;bottom:.5rem;right:.5rem;display:flex;gap:.25rem;">
+                <button onclick="_mapToggleInput(this)" title="Mouse mode (click for trackpad)" style="width:28px;height:28px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-size:.8rem;">🖱️</button>
                 <button onclick="atkMapZoom(1.3)" style="width:28px;height:28px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-size:.9rem;font-weight:700;">+</button>
                 <button onclick="atkMapZoom(1/1.3)" style="width:28px;height:28px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-size:.9rem;font-weight:700;">−</button>
                 <button onclick="atkMapReset()" style="width:28px;height:28px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-size:.7rem;">⌂</button>
@@ -3080,7 +3081,7 @@ function _drawAttackMap() {
       e.preventDefault();
       const rect = canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-      const factor = e.deltaY < 0 ? 1.15 : 1/1.15;
+      const factor = _mapZoomFactor(e.deltaY);
       const s = _atkMapState;
       s.offX = mx - (mx - s.offX) * factor;
       s.offY = my - (my - s.offY) * factor;

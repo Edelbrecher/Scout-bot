@@ -495,6 +495,30 @@ function escHtml(s) {
   <!-- i18n -->
   <script src="/static/i18n.js"></script>
 
+  <!-- Map input mode (mouse vs trackpad) -->
+  <script>
+  window._mapInputMode = localStorage.getItem('map_input_mode') || 'mouse';
+  window._mapZoomFactor = function(delta) {
+    var base = delta < 0 ? 1.15 : 1/1.15;
+    if (window._mapInputMode === 'trackpad') {
+      base = delta < 0 ? 1.07 : 1/1.07;
+    }
+    return base;
+  };
+  window._mapToggleInput = function(btn) {
+    window._mapInputMode = window._mapInputMode === 'mouse' ? 'trackpad' : 'mouse';
+    localStorage.setItem('map_input_mode', window._mapInputMode);
+    document.querySelectorAll('[data-map-input-btn]').forEach(function(b) {
+      b.textContent = window._mapInputMode === 'mouse' ? '🖱️' : '🔲';
+      b.title = window._mapInputMode === 'mouse' ? 'Mouse mode (click for trackpad)' : 'Trackpad mode (click for mouse)';
+    });
+    if (btn && !btn.hasAttribute('data-map-input-btn')) {
+      btn.textContent = window._mapInputMode === 'mouse' ? '🖱️' : '🔲';
+      btn.title = window._mapInputMode === 'mouse' ? 'Mouse mode (click for trackpad)' : 'Trackpad mode (click for mouse)';
+    }
+  };
+  </script>
+
   <!-- Promo popup -->
   <div id="beb-popup" style="display:none; position:fixed; bottom:1.5rem; right:1.5rem; z-index:9999; max-width:320px; border-radius:14px; box-shadow:0 8px 40px rgba(0,0,0,0.5); overflow:hidden; transform:translateY(30px); opacity:0; transition:transform 0.4s cubic-bezier(.22,1,.36,1), opacity 0.4s ease;">
     <div id="beb-popup-inner" style="padding:1.25rem 1.25rem 1rem; background:#1a1a2e; color:#f1f5f9;">
