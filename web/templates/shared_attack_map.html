@@ -5,7 +5,7 @@
 <title>Attack Map · TravOps</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#0d1a0d;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden;height:100vh}
+body{background:#2d5a1e;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden;height:100vh}
 #bar{display:flex;align-items:center;gap:.5rem;padding:.4rem .75rem;background:#111214;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap}
 #bar .title{font-size:.82rem;font-weight:700;color:#a5b4fc}
 #bar .legend{font-size:.6rem;display:flex;gap:.5rem;color:#94a3b8}
@@ -43,7 +43,7 @@ function draw(){
   const c=document.getElementById('c'),ctx=c.getContext('2d');
   const dpr=devicePixelRatio||1,W=c.clientWidth,H=c.clientHeight;
   c.width=W*dpr;c.height=H*dpr;ctx.scale(dpr,dpr);
-  ctx.fillStyle='#0d1a0d';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#2d5a1e';ctx.fillRect(0,0,W,H);
   const pts=[];
   D.forEach(a=>{if(a.ax!=null)pts.push({x:a.ax,y:a.ay});if(a.dx!=null)pts.push({x:a.dx,y:a.dy})});
   if(!pts.length){ctx.fillStyle='#94a3b8';ctx.font='14px sans-serif';ctx.textAlign='center';ctx.fillText('No data',W/2,H/2);return}
@@ -51,9 +51,19 @@ function draw(){
   const mn={x:Math.min(...xs)-5,y:Math.min(...ys)-5},mx={x:Math.max(...xs)+5,y:Math.max(...ys)+5};
   if(S.scale===0){const sx=(W-60)/(mx.x-mn.x||1),sy=(H-60)/(mx.y-mn.y||1);S.scale=Math.min(sx,sy);S.offX=(W-(mx.x-mn.x)*S.scale)/2-mn.x*S.scale;S.offY=(H-(mx.y-mn.y)*S.scale)/2-mn.y*S.scale}
   const tx=(x,y)=>({sx:x*S.scale+S.offX,sy:y*S.scale+S.offY});
-  ctx.strokeStyle='rgba(255,255,255,.04)';ctx.lineWidth=.5;
-  for(let g=Math.floor(mn.x/10)*10;g<=mx.x;g+=10){const{sx}=tx(g,0);ctx.beginPath();ctx.moveTo(sx,0);ctx.lineTo(sx,H);ctx.stroke()}
-  for(let g=Math.floor(mn.y/10)*10;g<=mx.y;g+=10){const{sy}=tx(0,g);ctx.beginPath();ctx.moveTo(0,sy);ctx.lineTo(W,sy);ctx.stroke()}
+  const{sx:bx0,sy:by0}=tx(-200,-200),{sx:bx1,sy:by1}=tx(200,200);
+  ctx.strokeStyle='rgba(255,255,255,.12)';ctx.lineWidth=1.5;ctx.strokeRect(bx0,by1,bx1-bx0,by0-by1);
+  const gS=S.scale>=3?10:S.scale>=1?50:100;
+  ctx.strokeStyle='rgba(0,0,0,.18)';ctx.lineWidth=.5;
+  for(let g=Math.floor(-200/gS)*gS;g<=200;g+=gS){const{sx}=tx(g,0);if(sx>0&&sx<W){ctx.beginPath();ctx.moveTo(sx,0);ctx.lineTo(sx,H);ctx.stroke()}}
+  for(let g=Math.floor(-200/gS)*gS;g<=200;g+=gS){const{sy}=tx(0,g);if(sy>0&&sy<H){ctx.beginPath();ctx.moveTo(0,sy);ctx.lineTo(W,sy);ctx.stroke()}}
+  const{sx:cx0,sy:cy0}=tx(0,0);ctx.strokeStyle='rgba(255,255,255,.25)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(cx0,0);ctx.lineTo(cx0,H);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,cy0);ctx.lineTo(W,cy0);ctx.stroke();
+  if(S.scale>=1){ctx.fillStyle='rgba(255,255,255,.18)';ctx.font='7px sans-serif';
+    for(let g=Math.floor(-200/gS)*gS;g<=200;g+=gS){if(!g)continue;const{sx}=tx(g,0);if(sx>0&&sx<W){ctx.textAlign='center';ctx.fillText(g,sx,H-2)}}
+    for(let g=Math.floor(-200/gS)*gS;g<=200;g+=gS){if(!g)continue;const{sy}=tx(0,g);if(sy>0&&sy<H){ctx.textAlign='left';ctx.fillText(g,2,sy-2)}}
+  }
   D.forEach(a=>{
     if(a.ax==null||a.dx==null)return;
     const{sx:ax,sy:ay}=tx(a.ax,a.ay),{sx:dx,sy:dy}=tx(a.dx,a.dy);
