@@ -6458,6 +6458,17 @@ async def attacks_api_incoming(
         defender_alliance=def_alliance or None,
         defender_village=def_village or None,
     )
+    needs_resolve = [a for a in attacks if a.get("own_village_x") is None and a.get("own_village_name")]
+    if needs_resolve:
+        resolved = {}
+        for a in needs_resolve:
+            vname = a["own_village_name"]
+            if vname not in resolved:
+                resolved[vname] = await database.resolve_village_coords(guild_id, vname)
+            coords = resolved[vname]
+            if coords:
+                a["own_village_x"] = coords["x"]
+                a["own_village_y"] = coords["y"]
     return JSONResponse(attacks)
 
 

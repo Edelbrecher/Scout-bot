@@ -512,6 +512,30 @@
     <!-- Hidden element kept for backward-compat JS references -->
     <div id="ownAttacksContent" style="display:none;"></div>
 
+    <!-- Village Attack Map Modal -->
+    <div id="villageMapModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1100;align-items:center;justify-content:center;backdrop-filter:blur(4px);"
+         onclick="if(event.target===this)closeVillageMap()">
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;width:90%;max-width:800px;max-height:85vh;overflow:hidden;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:.4rem .75rem;border-bottom:1px solid var(--border);">
+          <span id="vmTitle" style="font-size:.78rem;font-weight:700;">🗺️ Attack Map</span>
+          <button onclick="closeVillageMap()" style="background:none;border:none;color:var(--text-muted);font-size:1.2rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="position:relative;background:#0d1a0d;">
+          <canvas id="vmCanvas" style="display:block;width:100%;height:450px;cursor:crosshair;"></canvas>
+          <div id="vmTooltip" style="position:absolute;pointer-events:none;display:none;background:rgba(10,15,10,.95);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:.3rem .5rem;font-size:.68rem;z-index:10;max-width:200px;"></div>
+          <div style="position:absolute;bottom:.4rem;right:.4rem;display:flex;gap:.2rem;">
+            <button onclick="_mapToggleInput(this)" style="width:24px;height:24px;background:var(--bg-card);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;font-size:.75rem;">🖱️</button>
+            <button onclick="_vmZoom(1.3)" style="width:24px;height:24px;background:var(--bg-card);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;font-size:.85rem;font-weight:700;">+</button>
+            <button onclick="_vmZoom(1/1.3)" style="width:24px;height:24px;background:var(--bg-card);border:1px solid var(--border);border-radius:5px;color:var(--text);cursor:pointer;font-size:.85rem;font-weight:700;">−</button>
+          </div>
+          <div style="position:absolute;top:.3rem;left:.3rem;background:rgba(10,15,10,.85);border:1px solid rgba(255,255,255,.1);border-radius:5px;padding:.15rem .35rem;font-size:.58rem;display:flex;gap:.4rem;">
+            <span>🟥 Attacker</span><span>🟦 Defender</span>
+            <span style="color:#f87171;">— real</span><span style="color:#94a3b8;">— fake</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   {% if attack_reports %}
@@ -1849,6 +1873,8 @@
           ${g.account ? `<span style="font-size:.56rem;color:#60a5fa;font-weight:600;">${escHtml(g.account)}</span>` : ''}
           <span style="font-size:.54rem;color:var(--text-muted);">${escHtml(coords)}</span>
           <div style="margin-left:auto;display:flex;align-items:center;gap:.25rem;flex-shrink:0;">
+            <button onclick="event.stopPropagation();openVillageMap('${escHtml(key).replace(/'/g,"\\'")}')"
+              style="font-size:.5rem;padding:.08rem .25rem;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:3px;color:#a5b4fc;cursor:pointer;" title="Attack Map">🗺️</button>
             <span style="font-size:.54rem;color:var(--text-muted);">${g.attacks.length}</span>
             ${realCount > 0 ? `<span style="color:#f87171;font-size:.54rem;font-weight:700;">⚠️${realCount}</span>` : ''}
             ${supportCount > 0 ? `<span style="color:#4ade80;font-size:.54rem;">🛡️${supportCount}</span>` : ''}
@@ -2886,6 +2912,117 @@ window.showAttackerTab = function(tab) {
   if (tab === 'map')  _drawAttackMap();
   if (tab === 'flow') _renderFlowDiagram();
 };
+
+// ── Per-village attack map modal ─────────────────────────────────────────────
+const _vm = {scale:0,offX:0,offY:0,drag:false,lx:0,ly:0};
+let _vmData = [];
+
+window.openVillageMap = function(villageKey) {
+  const groups = buildGroups(_allAttacks);
+  const g = groups[villageKey];
+  if (!g || !g.attacks.length) return;
+  _vmData = g.attacks.filter(a => a.attacker_x != null);
+  if (!_vmData.length && !g.x) { showToast('No coordinates available for this village.','error'); return; }
+  document.getElementById('vmTitle').textContent = '🗺️ ' + g.name + (g.x != null ? ' ('+g.x+'|'+g.y+')' : '');
+  _vm.scale=0; _vm.offX=0; _vm.offY=0;
+  document.getElementById('villageMapModal').style.display = 'flex';
+  setTimeout(_vmDraw, 50);
+};
+
+window.closeVillageMap = function() {
+  document.getElementById('villageMapModal').style.display = 'none';
+};
+
+window._vmZoom = function(f) { _vm.scale*=f; _vmDraw(); };
+
+function _vmDraw() {
+  const canvas = document.getElementById('vmCanvas');
+  if (!canvas) return;
+  const data = _vmData;
+  const pts = [];
+  for (const a of data) {
+    if (a.attacker_x!=null) pts.push({x:a.attacker_x,y:a.attacker_y});
+    if (a.own_village_x!=null) pts.push({x:a.own_village_x,y:a.own_village_y});
+  }
+  const dpr = window.devicePixelRatio||1;
+  const W = canvas.clientWidth, H = canvas.clientHeight||450;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.fillStyle='#0d1a0d'; ctx.fillRect(0,0,W,H);
+  if (!pts.length) { ctx.fillStyle='#94a3b8';ctx.font='13px sans-serif';ctx.textAlign='center';ctx.fillText('No coordinates',W/2,H/2); return; }
+
+  const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y);
+  const minX=Math.min(...xs)-5,maxX=Math.max(...xs)+5,minY=Math.min(...ys)-5,maxY=Math.max(...ys)+5;
+  if (_vm.scale===0) {
+    const sx=(W-60)/(maxX-minX||1),sy=(H-60)/(maxY-minY||1);
+    _vm.scale=Math.min(sx,sy);
+    _vm.offX=(W-(maxX-minX)*_vm.scale)/2-minX*_vm.scale;
+    _vm.offY=(H-(maxY-minY)*_vm.scale)/2-minY*_vm.scale;
+  }
+  const tx=(x,y)=>({sx:x*_vm.scale+_vm.offX,sy:y*_vm.scale+_vm.offY});
+
+  // Grid
+  ctx.strokeStyle='rgba(255,255,255,.04)';ctx.lineWidth=0.5;
+  for(let gx=Math.floor(minX/10)*10;gx<=maxX;gx+=10){const{sx}=tx(gx,0);ctx.beginPath();ctx.moveTo(sx,0);ctx.lineTo(sx,H);ctx.stroke();}
+  for(let gy=Math.floor(minY/10)*10;gy<=maxY;gy+=10){const{sy}=tx(0,gy);ctx.beginPath();ctx.moveTo(0,sy);ctx.lineTo(W,sy);ctx.stroke();}
+
+  // Arrows + labels
+  for (const a of data) {
+    if (a.attacker_x==null||a.own_village_x==null) continue;
+    const{sx:ax,sy:ay}=tx(a.attacker_x,a.attacker_y);
+    const{sx:dx,sy:dy}=tx(a.own_village_x,a.own_village_y);
+    const isFake=(a.fake_score||50)>=70||a.label==='fake';
+    const isSupp=a.attack_type==='support';
+    const isReal=!isFake&&!isSupp&&(a.fake_score||50)<60;
+    const color=isSupp?'#4ade80':isFake?'rgba(148,163,184,.35)':isReal?'rgba(248,113,113,.7)':'rgba(251,191,36,.5)';
+    ctx.strokeStyle=color; ctx.lineWidth=isReal?2:1;
+    ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(dx,dy);ctx.stroke();
+    const ang=Math.atan2(dy-ay,dx-ax),hl=7;
+    ctx.beginPath();ctx.moveTo(dx,dy);ctx.lineTo(dx-hl*Math.cos(ang-.4),dy-hl*Math.sin(ang-.4));ctx.moveTo(dx,dy);ctx.lineTo(dx-hl*Math.cos(ang+.4),dy-hl*Math.sin(ang+.4));ctx.stroke();
+    // Label
+    const mx2=(ax+dx)/2,my2=(ay+dy)/2;
+    const dist=Math.sqrt(Math.pow(a.attacker_x-a.own_village_x,2)+Math.pow(a.attacker_y-a.own_village_y,2));
+    let lbl=a.arrival_time?(a.arrival_time.slice(11,16)||''):'';
+    if(dist>0)lbl+=(lbl?' · ':'')+dist.toFixed(0)+'f';
+    if(lbl){
+      ctx.save();ctx.font='8px sans-serif';ctx.textAlign='center';
+      const tw=ctx.measureText(lbl).width;
+      ctx.fillStyle='rgba(0,0,0,.65)';ctx.fillRect(mx2-tw/2-2,my2-5,tw+4,11);
+      ctx.fillStyle=isSupp?'#86efac':isFake?'#94a3b8':'#fca5a5';
+      ctx.fillText(lbl,mx2,my2+3);ctx.restore();
+    }
+  }
+
+  // Nodes
+  const defN=new Map(),atkN=new Map();
+  for(const a of data){
+    if(a.own_village_x!=null){const k=a.own_village_x+','+a.own_village_y;if(!defN.has(k))defN.set(k,{x:a.own_village_x,y:a.own_village_y,name:a.own_village_name});defN.get(k).count=(defN.get(k).count||0)+1;}
+    if(a.attacker_x!=null){const k=a.attacker_x+','+a.attacker_y;if(!atkN.has(k))atkN.set(k,{x:a.attacker_x,y:a.attacker_y,name:a.attacker_player});atkN.get(k).count=(atkN.get(k).count||0)+1;}
+  }
+  for(const[,n] of defN){const{sx,sy}=tx(n.x,n.y);ctx.fillStyle='#3b82f6';ctx.beginPath();ctx.arc(sx,sy,6,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#93c5fd';ctx.lineWidth=1.5;ctx.stroke();ctx.fillStyle='#dbeafe';ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.fillText(n.name,sx,sy-10);}
+  for(const[,n] of atkN){const{sx,sy}=tx(n.x,n.y);ctx.fillStyle='#ef4444';ctx.beginPath();ctx.arc(sx,sy,5,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fca5a5';ctx.font='9px sans-serif';ctx.textAlign='center';ctx.fillText(n.name+(n.count>1?' ×'+n.count:''),sx,sy-8);}
+}
+
+// Modal canvas interactions
+(function(){
+  const c=document.getElementById('vmCanvas');if(!c)return;
+  c.addEventListener('mousedown',e=>{_vm.drag=true;_vm.lx=e.offsetX;_vm.ly=e.offsetY;});
+  c.addEventListener('mousemove',e=>{
+    if(_vm.drag){_vm.offX+=e.offsetX-_vm.lx;_vm.offY+=e.offsetY-_vm.ly;_vm.lx=e.offsetX;_vm.ly=e.offsetY;_vmDraw();return;}
+    const tip=document.getElementById('vmTooltip');if(!tip)return;
+    const mx=e.offsetX,my=e.offsetY;let hit=null;
+    for(const a of _vmData){
+      if(a.own_village_x!=null){const sx=a.own_village_x*_vm.scale+_vm.offX,sy=a.own_village_y*_vm.scale+_vm.offY;if(Math.abs(sx-mx)<10&&Math.abs(sy-my)<10){hit={name:a.own_village_name,x:a.own_village_x,y:a.own_village_y,type:'def'};break;}}
+      if(a.attacker_x!=null){const sx=a.attacker_x*_vm.scale+_vm.offX,sy=a.attacker_y*_vm.scale+_vm.offY;if(Math.abs(sx-mx)<10&&Math.abs(sy-my)<10){hit={name:a.attacker_player,x:a.attacker_x,y:a.attacker_y,type:'atk'};break;}}
+    }
+    if(hit){tip.style.display='block';tip.style.left=(mx+12)+'px';tip.style.top=(my-8)+'px';tip.innerHTML=`<strong>${escHtml(hit.name)}</strong><br>(${hit.x}/${hit.y})`;}
+    else tip.style.display='none';
+  });
+  c.addEventListener('mouseup',()=>{_vm.drag=false;});
+  c.addEventListener('mouseleave',()=>{_vm.drag=false;});
+  c.addEventListener('wheel',e=>{e.preventDefault();e.stopPropagation();const rect=c.getBoundingClientRect();const mx=e.clientX-rect.left,my=e.clientY-rect.top;const f=_mapZoomFactor(e.deltaY);_vm.offX=mx-(mx-_vm.offX)*f;_vm.offY=my-(my-_vm.offY)*f;_vm.scale*=f;_vmDraw();},{passive:false});
+})();
 
 function renderAttackerTable(attacks) {
   _atkMapData = attacks;
