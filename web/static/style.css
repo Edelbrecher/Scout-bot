@@ -243,6 +243,8 @@ body.sidebar-collapsed #guild-sidebar { width: 58px; }
   padding: 0.6rem 0 1.5rem;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.08) transparent;
+  font-size: var(--gs-font-size, 0.82rem);
+  font-family: var(--gs-font-family, inherit);
 }
 
 #guild-sidebar .gs-toggle {

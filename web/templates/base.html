@@ -973,7 +973,7 @@ function escHtml(s) {
   })();
 
   function _applySidebarStyle(s) {
-    var sb = document.getElementById('gs-sidebar');
+    var sb = document.getElementById('guild-sidebar');
     if (!sb) return;
     if (s.font_size)   sb.style.setProperty('--gs-font-size',   s.font_size);
     else               sb.style.removeProperty('--gs-font-size');
