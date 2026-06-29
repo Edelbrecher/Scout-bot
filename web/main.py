@@ -2822,29 +2822,12 @@ async def toggle_role(request: Request, guild_id: str, role_id: str, field: str 
     archive_ids = (guild_row or {}).get("archive_role_ids") or ""
 
     archive_sync_status = None
-    if field == "allowed_role_ids":
-        if guild_row and guild_row.get("archive_channel_id"):
-            sc, _ = await _sync_archive_permissions(guild_id, guild_row["archive_channel_id"], allowed_ids, archive_ids)
-            archive_sync_status = sc
-        asyncio.create_task(_sync_scout_channel_permissions(guild_id, allowed_ids))
-        asyncio.create_task(_sync_defend_channel_permissions(guild_id, defend_ids, allowed_ids))
-
-    if field == "archive_role_ids":
-        if guild_row and guild_row.get("archive_channel_id"):
-            sc, body = await _sync_archive_permissions(guild_id, guild_row["archive_channel_id"], allowed_ids, archive_ids)
-            archive_sync_status = sc
-
-    if field == "defend_role_ids":
-        asyncio.create_task(_sync_defend_channel_permissions(guild_id, defend_ids, allowed_ids))
-
-    if field == "scout_view_role_ids":
-        asyncio.create_task(_sync_scout_channel_permissions(guild_id, allowed_ids))
-
-    if field in ("allowed_role_ids", "private_channel_role_ids"):
-        asyncio.create_task(_sync_private_channel_permissions(guild_id, priv_ids, allowed_ids))
-
-    if field in ("res_push_view_role_ids", "res_manager_role_ids"):
-        asyncio.create_task(_sync_scout_channel_permissions(guild_id, allowed_ids))
+    if guild_row and guild_row.get("archive_channel_id"):
+        sc, _ = await _sync_archive_permissions(guild_id, guild_row["archive_channel_id"], allowed_ids, archive_ids)
+        archive_sync_status = sc
+    asyncio.create_task(_sync_scout_channel_permissions(guild_id, allowed_ids))
+    asyncio.create_task(_sync_defend_channel_permissions(guild_id, defend_ids, allowed_ids))
+    asyncio.create_task(_sync_private_channel_permissions(guild_id, priv_ids, allowed_ids))
 
     return JSONResponse({"added": added, "archive_sync": archive_sync_status})
 
