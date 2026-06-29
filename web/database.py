@@ -10716,14 +10716,20 @@ async def delete_attack(attack_id: int, guild_id: str) -> bool:
 
 
 async def auto_archive_past_attacks(guild_id: str) -> int:
-    """Archive attacks whose arrival_time has passed."""
+    """Archive attacks whose arrival_time has passed (accounting for server UTC offset)."""
     await _init_attack_detection_tables()
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT server_utc_offset FROM guild_configs WHERE guild_id=?", (guild_id,)
+        ) as cur:
+            row = await cur.fetchone()
+        offset_min = (row["server_utc_offset"] if row and row["server_utc_offset"] else 0) or 0
         cur = await db.execute(
             """UPDATE incoming_attacks SET is_dismissed=1
                WHERE guild_id=? AND is_dismissed=0
-               AND arrival_time != '' AND arrival_time < datetime('now')""",
-            (guild_id,)
+               AND arrival_time != '' AND arrival_time < datetime('now', ?)""",
+            (guild_id, f"+{offset_min} minutes")
         )
         await db.commit()
         return cur.rowcount
