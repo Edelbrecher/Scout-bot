@@ -1961,6 +1961,67 @@
     </div>`;
   }
 
+  function _buildSpeedAnalysis(a) {
+    const dx = (a.own_village_x||0) - (a.attacker_x||0);
+    const dy = (a.own_village_y||0) - (a.attacker_y||0);
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (!dist || a.attacker_x == null || a.own_village_x == null) {
+      return '<span style="font-size:.75rem;color:var(--text-muted);">No coordinates — speed analysis unavailable</span>';
+    }
+    if (!a.server_time_at_import || !a.arrival_time) {
+      return `<span style="font-size:.75rem;color:var(--text-muted);">📐 Distance: ${dist.toFixed(1)} fields — no timing data for speed estimate</span>`;
+    }
+    const importTs = new Date(a.server_time_at_import).getTime();
+    const arrivalTs = new Date(a.arrival_time).getTime();
+    const remainSec = Math.round((arrivalTs - importTs) / 1000);
+    if (remainSec <= 0) {
+      return `<span style="font-size:.75rem;color:var(--text-muted);">📐 Distance: ${dist.toFixed(1)} fields — already arrived</span>`;
+    }
+    const possible = estimateTroopComposition(dist, remainSec, 1);
+    if (!possible || !possible.length) {
+      return `<span style="font-size:.75rem;color:var(--text-muted);">📐 ${dist.toFixed(1)} fields — too fast for any known troop type</span>`;
+    }
+    const slowest = possible[0];
+    const fastest = possible[possible.length-1];
+    const distFmt = dist.toFixed(1);
+    const travelH = (remainSec/3600).toFixed(1);
+    const minSpeed = (dist / (remainSec/3600)).toFixed(1);
+
+    let html = `<div style="font-size:.75rem;margin-bottom:.4rem;color:var(--text-muted);">
+      📐 <strong>${distFmt}</strong> fields · ⏳ ~${travelH}h travel · min speed: <strong>${minSpeed} f/h</strong>
+    </div>`;
+
+    const dangerTypes = possible.filter(t => t.speed <= 4);
+    if (dangerTypes.length) {
+      html += `<div style="padding:.3rem .5rem;border-radius:6px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);margin-bottom:.35rem;">
+        <div style="font-size:.72rem;font-weight:700;color:#f87171;">⚠️ Slow enough for:</div>
+        <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.2rem;">`;
+      for (const t of dangerTypes) {
+        html += `<span style="font-size:.72rem;font-weight:700;padding:.1rem .4rem;border-radius:5px;
+          background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25);color:${t.color};">
+          ${t.icon} ${t.name}${t.tp > 0 ? ' (TP'+t.tp+'+)' : ''}</span>`;
+      }
+      html += '</div></div>';
+    } else {
+      html += `<div style="padding:.2rem .5rem;border-radius:6px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);font-size:.72rem;color:#4ade80;margin-bottom:.35rem;">
+        ✅ Too fast for catapults/chiefs — likely cavalry or fast infantry
+      </div>`;
+    }
+
+    html += '<div style="display:flex;flex-wrap:wrap;gap:.2rem;">';
+    for (const t of possible) {
+      const isDanger = t.speed <= 4;
+      html += `<span style="font-size:.68rem;padding:.08rem .35rem;border-radius:4px;
+        background:${isDanger?'rgba(239,68,68,.1)':'rgba(255,255,255,.04)'};
+        border:1px solid ${isDanger?'rgba(239,68,68,.25)':'rgba(255,255,255,.08)'};
+        color:${t.color};${isDanger?'font-weight:700;':''}">
+        ${t.icon} ${t.name.split('/')[0].trim()}${t.tp > 0 ? ' TP'+t.tp : ''}
+      </span>`;
+    }
+    html += '</div>';
+    return html;
+  }
+
   function renderAttackRow(a) {
     const lbl       = a.label || '';
     const lblClass  = lbl ? ' lbl-'+lbl : '';
@@ -2074,8 +2135,15 @@
       <!-- Arrival -->
       <div style="padding:.65rem 1rem;border-bottom:1px solid var(--border);">
         <div style="font-size:.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem;">Arrival</div>
-        <div style="font-size:1rem;font-weight:800;font-family:monospace;">${fmtArrival(a.arrival_time)}</div>
+        <div style="font-size:1.2rem;font-weight:900;font-family:'Courier New',monospace;letter-spacing:.05em;">${fmtArrival(a.arrival_time)}</div>
         ${a.arrival_time ? `<div style="font-size:.72rem;color:var(--text-muted);margin-top:.15rem;" id="detail-countdown-${a.id}"></div>` : ''}
+        ${a.has_artifact ? `<div style="margin-top:.3rem;font-size:.72rem;font-weight:700;padding:.2rem .5rem;border-radius:6px;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);color:#fbbf24;display:inline-block;">🏺 Artifact village: ${escHtml(a.artifact_name||'')}</div>` : ''}
+      </div>
+
+      <!-- First seen -->
+      <div style="padding:.4rem 1rem;border-bottom:1px solid var(--border);font-size:.72rem;color:var(--text-muted);">
+        📥 First imported: <strong style="color:var(--text);">${a.import_time ? a.import_time.slice(0,16).replace('T',' ') : '—'}</strong>
+        ${a.imported_by_name ? ` by ${escHtml(a.imported_by_name)}` : ''}
       </div>
 
       <!-- Troops -->
@@ -2084,9 +2152,10 @@
         ${troopDetailHtml}
       </div>
 
-      <!-- Troop estimate -->
-      <div style="padding:.5rem 1rem;border-bottom:1px solid var(--border);">
-        ${troopEstimateLine(a) || '<span style="font-size:.75rem;color:var(--text-muted);">No speed estimate available</span>'}
+      <!-- Speed analysis -->
+      <div style="padding:.65rem 1rem;border-bottom:1px solid var(--border);">
+        <div style="font-size:.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem;">Speed Analysis</div>
+        ${_buildSpeedAnalysis(a)}
       </div>
 
       <!-- Fake Analysis -->
