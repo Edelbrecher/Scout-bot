@@ -1680,8 +1680,6 @@ async def _sync_defend_channel_permissions(guild_id: str, defend_role_ids: str =
 
     async with httpx.AsyncClient(timeout=10) as client:
         for rec in channels:
-            if rec.get("status") == "closed":
-                continue
             channel_id = rec["channel_id"]
             try:
                 resp = await client.get(

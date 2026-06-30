@@ -607,13 +607,18 @@ async def _archive_push_channel(interaction: discord.Interaction):
         guild = interaction.guild
         ARCHIVE_NAME = "📦 Archive-Pushes"
         archive_cat = None
-        for cat in guild.categories:
-            if cat.name == ARCHIVE_NAME:
+        candidates = sorted(
+            [cat for cat in guild.categories if cat.name == ARCHIVE_NAME or cat.name.startswith(ARCHIVE_NAME + " ")],
+            key=lambda c: (c.name != ARCHIVE_NAME, c.name)
+        )
+        for cat in candidates:
+            if len(cat.channels) < 50:
                 archive_cat = cat
                 break
         if not archive_cat:
+            new_name = ARCHIVE_NAME if not candidates else f"{ARCHIVE_NAME} {len(candidates)+1}"
             archive_cat = await guild.create_category(
-                ARCHIVE_NAME,
+                new_name,
                 overwrites={
                     guild.default_role: discord.PermissionOverwrite(view_channel=False),
                     guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True),
