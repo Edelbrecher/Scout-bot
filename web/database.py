@@ -5902,6 +5902,21 @@ async def find_ally_member_by_name(guild_id: str, name: str) -> dict | None:
             return dict(row) if row else None
 
 
+async def find_ally_member_by_discord_id(guild_id: str, discord_id: str) -> dict | None:
+    """Find an ally member by their Discord user ID."""
+    await _init_ally_tables()
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT am.* FROM ally_members am
+            JOIN ally_groups ag ON ag.id = am.ally_group_id
+            WHERE ag.guild_id = ? AND am.discord_id = ?
+            LIMIT 1
+        """, (guild_id, discord_id)) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
 async def get_ally_membership(guild_id: str, discord_id: str) -> dict | None:
     """Return the ally_group this user has joined (not owner) in this guild."""
     await _init_ally_tables()

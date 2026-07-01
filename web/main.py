@@ -18385,20 +18385,99 @@ async def artifact_rotation_save(request: Request, guild_id: str, artifact_id: i
                         "artifact_name": artifact.get("name", "Artifact"),
                         "members": members,
                     })
-                    end_ts = (_dt.datetime.utcnow() + _dt.timedelta(hours=hold_h)).strftime("%Y-%m-%d %H:%M")
-                    await client.post("http://bot:7777/api/channel-message", json={
+                    await client.post("http://bot:7777/api/post-pickup-button", json={
                         "guild_id": guild_id,
                         "channel_id": ch_id,
-                        "content": (
-                            f"🔄 **Rotation updated manually.**\n"
-                            f"🟢 **{new_holder}** is now holding **{artifact.get('name','Artifact')}** "
-                            f"for {hold_h}h — until **{end_ts} UTC**, then → **{next_player}**."
-                        ),
+                        "artifact_id": artifact_id,
+                        "artifact_name": artifact.get("name", "Artifact"),
+                        "current_holder": new_holder,
+                        "next_player": next_player,
+                        "hold_hours": hold_h,
                     })
         except Exception as e:
             print(f"[rotation] update channel on save failed: {e}", flush=True)
 
     return JSONResponse({"ok": True})
+
+
+@app.post("/guild/{guild_id}/artifacts/{artifact_id}/rotation/confirm-pickup")
+async def artifact_rotation_confirm_pickup(request: Request, guild_id: str, artifact_id: int):
+    """Called by the Discord bot when a player clicks the pickup confirmation button.
+    Finds the player by discord_id, moves them to position 0, resets rotation start."""
+    body = await request.body()
+    try:
+        data = __import__("json").loads(body)
+    except Exception:
+        return JSONResponse({"ok": False, "error": "invalid json"}, status_code=400)
+
+    discord_id = str(data.get("discord_id", ""))
+    if not discord_id:
+        return JSONResponse({"ok": False, "error": "missing discord_id"}, status_code=400)
+
+    artifact = await database.get_artifact(artifact_id, guild_id)
+    if not artifact:
+        return JSONResponse({"ok": False, "error": "artifact not found"}, status_code=404)
+    if not artifact.get("rotation_active"):
+        return JSONResponse({"ok": False, "error": "Rotation is not active"}, status_code=400)
+
+    # Find player by discord_id in ally_members
+    member = await database.find_ally_member_by_discord_id(guild_id, discord_id)
+    if not member:
+        return JSONResponse({"ok": False, "error": "You are not in the ally member list"}, status_code=403)
+
+    player_name = member.get("travian_name") or member.get("player_name") or ""
+    if not player_name:
+        return JSONResponse({"ok": False, "error": "Could not resolve player name"}, status_code=400)
+
+    rotation = await database.get_rotation(artifact_id, guild_id)
+    if not rotation:
+        return JSONResponse({"ok": False, "error": "No rotation configured"}, status_code=400)
+
+    # Find the player in rotation
+    player_entry = next((p for p in rotation if p["player_name"].lower() == player_name.lower()), None)
+    if not player_entry:
+        return JSONResponse({"ok": False, "error": f"{player_name} is not in this rotation"}, status_code=403)
+
+    # Reorder: move clicked player to position 0, preserve relative order for rest
+    idx = rotation.index(player_entry)
+    new_order = rotation[idx:] + rotation[:idx]
+
+    import datetime as _dt
+    started = _dt.datetime.utcnow().isoformat()
+    await database.save_rotation(artifact_id, guild_id, [
+        {"player_name": p["player_name"], "hold_hours": p["hold_hours"],
+         "notify_hours": p["notify_hours"], "village_x": p.get("village_x", 0),
+         "village_y": p.get("village_y", 0)}
+        for p in new_order
+    ])
+    await database.set_artifact_rotation_state(
+        artifact_id, guild_id,
+        rotation_started_at=started,
+        current_holder=player_name,
+        rot_last_start_window=-1,
+        rot_last_notify_window=-1,
+    )
+
+    # Post updated pickup button
+    ch_id = artifact.get("rotation_channel_id", "")
+    if ch_id:
+        next_player = new_order[1]["player_name"] if len(new_order) > 1 else ""
+        hold_h = int(new_order[0].get("hold_hours", 30) or 30)
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                await client.post("http://bot:7777/api/post-pickup-button", json={
+                    "guild_id": guild_id,
+                    "channel_id": ch_id,
+                    "artifact_id": artifact_id,
+                    "artifact_name": artifact.get("name", "Artifact"),
+                    "current_holder": player_name,
+                    "next_player": next_player,
+                    "hold_hours": hold_h,
+                })
+        except Exception as e:
+            print(f"[rotation] repost pickup button failed: {e}", flush=True)
+
+    return JSONResponse({"ok": True, "player_name": player_name})
 
 
 @app.get("/guild/{guild_id}/artifacts/{artifact_id}/rotation/state")
@@ -18471,6 +18550,25 @@ async def artifact_rotation_start(request: Request, guild_id: str, artifact_id: 
     )
     unresolved = [p["player_name"] for p in rotation
                   if p["player_name"] not in {m["player_name"] for m in members}]
+
+    # Post sticky pickup button to the rotation channel
+    if channel_id:
+        next_player = rotation[1]["player_name"] if len(rotation) > 1 else ""
+        hold_h = int(rotation[0].get("hold_hours", 30) or 30)
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                await client.post("http://bot:7777/api/post-pickup-button", json={
+                    "guild_id": guild_id,
+                    "channel_id": channel_id,
+                    "artifact_id": artifact_id,
+                    "artifact_name": artifact.get("name", "Artifact"),
+                    "current_holder": rotation[0]["player_name"],
+                    "next_player": next_player,
+                    "hold_hours": hold_h,
+                })
+        except Exception as e:
+            print(f"[rotation] post pickup button on start failed: {e}", flush=True)
+
     return JSONResponse({"ok": True, "channel_id": channel_id, "unresolved": unresolved})
 
 

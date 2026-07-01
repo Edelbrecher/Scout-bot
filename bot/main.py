@@ -1757,6 +1757,93 @@ async def handle_delete_artifact_channels(request: aiohttp_web.Request) -> aioht
 
 _ROTATION_CAT_NAME = "🏺 Artifact Rotations"
 
+
+class PickupConfirmView(discord.ui.View):
+    """Persistent button view for artifact pickup confirmation."""
+    def __init__(self, artifact_id: int, guild_id: str, artifact_name: str):
+        super().__init__(timeout=None)
+        self.artifact_id = artifact_id
+        self.guild_id = guild_id
+        self.artifact_name = artifact_name
+        btn = discord.ui.Button(
+            label="✅ I have the artifact",
+            style=discord.ButtonStyle.success,
+            custom_id=f"pickup:{guild_id}:{artifact_id}",
+        )
+        btn.callback = self.on_pickup
+        self.add_item(btn)
+
+    async def on_pickup(self, interaction: discord.Interaction):
+        discord_id = str(interaction.user.id)
+        guild_id = self.guild_id
+        artifact_id = self.artifact_id
+        try:
+            async with aiohttp.ClientSession() as session:
+                r = await session.post(
+                    f"http://web:8080/guild/{guild_id}/artifacts/{artifact_id}/rotation/confirm-pickup",
+                    json={"discord_id": discord_id},
+                )
+                data = await r.json()
+        except Exception as e:
+            await interaction.response.send_message(
+                f"⚠️ Could not reach server: {e}", ephemeral=True
+            )
+            return
+        if not data.get("ok"):
+            err = data.get("error", "unknown error")
+            await interaction.response.send_message(
+                f"⚠️ {err}", ephemeral=True
+            )
+            return
+        player_name = data.get("player_name", interaction.user.display_name)
+        await interaction.response.send_message(
+            f"✅ **{player_name}** confirmed pickup of **{self.artifact_name}**! "
+            f"Rotation updated — you are now holder #1.",
+            ephemeral=False,
+        )
+
+
+async def handle_post_pickup_button(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Post (or re-post) the sticky pickup confirmation button to the rotation channel."""
+    data = await request.json()
+    guild_id = data.get("guild_id")
+    channel_id = data.get("channel_id")
+    artifact_id = int(data.get("artifact_id", 0))
+    artifact_name = data.get("artifact_name", "Artifact")
+    current_holder = data.get("current_holder", "")
+    next_player = data.get("next_player", "")
+    hold_hours = int(data.get("hold_hours", 30))
+
+    guild = bot.get_guild(int(guild_id)) if guild_id else None
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "Guild not found"})
+    try:
+        ch = guild.get_channel(int(channel_id))
+        if not ch:
+            return aiohttp_web.json_response({"ok": False, "error": "Channel not found"})
+
+        embed = discord.Embed(
+            title=f"🏺 {artifact_name} — Rotation",
+            color=0x22c55e,
+        )
+        embed.add_field(name="Current holder", value=f"**{current_holder}**" if current_holder else "—", inline=True)
+        embed.add_field(name="Hold time", value=f"{hold_hours}h", inline=True)
+        if next_player:
+            embed.add_field(name="Next", value=f"**{next_player}**", inline=True)
+        embed.set_footer(text="Click the button below once you have picked up the artifact.")
+
+        view = PickupConfirmView(artifact_id, guild_id, artifact_name)
+        msg = await ch.send(embed=embed, view=view)
+        try:
+            await msg.pin()
+        except Exception:
+            pass
+        return aiohttp_web.json_response({"ok": True, "message_id": str(msg.id)})
+    except Exception as e:
+        print(f"[rotation] post-pickup-button error: {e}", flush=True)
+        return aiohttp_web.json_response({"ok": False, "error": str(e)})
+
+
 async def handle_create_rotation_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
     data = await request.json()
     guild_id = data.get("guild_id")
@@ -2049,6 +2136,7 @@ async def start_api_server():
     app.router.add_post("/api/create-rotation-channel", handle_create_rotation_channel)
     app.router.add_post("/api/update-rotation-channel", handle_update_rotation_channel)
     app.router.add_post("/api/archive-rotation-channel", handle_archive_rotation_channel)
+    app.router.add_post("/api/post-pickup-button", handle_post_pickup_button)
     app.router.add_post("/api/channel-message", handle_channel_message)
     app.router.add_post("/api/dm-invite", handle_dm_invite)
     app.router.add_post("/api/create-interest-channel", handle_create_interest_channel)
