@@ -2714,7 +2714,7 @@ async def guild_page(request: Request, guild_id: str, saved: str = ""):
 async def scout_page(request: Request, guild_id: str, saved: str = ""):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -2744,7 +2744,7 @@ async def scout_save(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     err = await _require_alliance(guild, guild_id)
@@ -2779,7 +2779,7 @@ async def guild_save(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
 
     category_id = sanitize_snowflake(category_id)
@@ -2806,7 +2806,7 @@ async def guild_save(
 async def toggle_role(request: Request, guild_id: str, role_id: str, field: str = Form(...)):
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=403)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     if field not in {"allowed_role_ids", "res_manager_role_ids", "private_channel_role_ids", "defend_role_ids", "archive_role_ids", "res_push_view_role_ids", "scout_view_role_ids", "artifact_rules_role_ids", "artifact_interest_role_ids"}:
         return JSONResponse({"error": "invalid field"}, status_code=400)
@@ -2834,7 +2834,7 @@ async def toggle_role(request: Request, guild_id: str, role_id: str, field: str 
 async def reset_scout(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.reset_scout_config(guild_id)
     return RedirectResponse(f"/guild/{guild_id}/scout?saved=1", status_code=303)
@@ -2844,7 +2844,7 @@ async def reset_scout(request: Request, guild_id: str):
 async def reset_res_push(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.reset_res_config(guild_id)
     return RedirectResponse(f"/guild/{guild_id}/res-push?flash=status_changed", status_code=303)
@@ -2854,7 +2854,7 @@ async def reset_res_push(request: Request, guild_id: str):
 async def auto_setup(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
 
     guild = await database.get_guild(guild_id)
@@ -2913,7 +2913,7 @@ async def fix_archive_perms(request: Request, guild_id: str):
     """Fix bot permissions on the archive channel and re-sync role visibility."""
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild or not guild.get("archive_channel_id"):
@@ -2995,7 +2995,7 @@ async def guild_stats(request: Request, guild_id: str):
 async def post_button(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
 
     guild = await database.get_guild(guild_id)
@@ -3125,7 +3125,7 @@ async def res_push_settings_page(request: Request, guild_id: str, saved: str = "
     """Res-push configuration page (channel IDs, roles)."""
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -3148,7 +3148,7 @@ async def res_push_save(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
 
     await database.update_res_config(
@@ -3165,7 +3165,7 @@ async def res_push_save(
 async def res_post_button(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild or not guild.get("res_request_channel_id"):
@@ -3191,7 +3191,7 @@ async def res_post_button(request: Request, guild_id: str):
 async def res_auto_setup(request: Request, guild_id: str, next: str = Form("")):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -3362,7 +3362,7 @@ async def _close_scout_channel_after_delay(channel_id: str, token: str, delay: i
 async def scout_channel_close(request: Request, guild_id: str, channel_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid", "")
     guild = await database.get_guild(guild_id)
@@ -3416,7 +3416,7 @@ async def scout_channel_status(request: Request, guild_id: str, channel_id: str)
 async def scout_channel_detail(request: Request, guild_id: str, channel_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -3434,7 +3434,7 @@ async def scout_share_card(request: Request, guild_id: str, report_id: int):
     """Return a PNG share card for a single scout report."""
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     report = await database.get_scout_report_by_id(report_id, guild_id)
     if not report:
@@ -3453,7 +3453,7 @@ async def scout_share_card(request: Request, guild_id: str, report_id: int):
 async def scout_stats_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -3473,7 +3473,7 @@ async def scout_stats_page(request: Request, guild_id: str):
 async def polls_page(request: Request, guild_id: str, saved: str = ""):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -3539,7 +3539,7 @@ async def polls_page(request: Request, guild_id: str, saved: str = ""):
 async def polls_config_save(request: Request, guild_id: str, poll_channel_id: str = Form("")):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.update_poll_channel(guild_id, sanitize_snowflake(poll_channel_id))
     return RedirectResponse(f"/guild/{guild_id}/polls?saved=1", status_code=303)
@@ -3570,7 +3570,7 @@ async def polls_create(
     type_opts = POLL_TYPES.get(poll_type, POLL_TYPES["availability"])
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
 
@@ -3759,7 +3759,7 @@ async def polls_create(
 async def polls_auto_setup(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -3810,7 +3810,7 @@ async def polls_auto_setup(request: Request, guild_id: str):
 async def polls_reset(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.update_poll_channel(guild_id, "")
     return RedirectResponse(f"/guild/{guild_id}/polls?saved=1", status_code=303)
@@ -3820,7 +3820,7 @@ async def polls_reset(request: Request, guild_id: str):
 async def polls_close(request: Request, guild_id: str, poll_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     if not (session.get("type") == "admin" or await has_perm(request, guild_id, "poll_manage")):
         return RedirectResponse(f"/guild/{guild_id}/polls", status_code=303)
@@ -3865,7 +3865,7 @@ async def poll_response_edit(
     # Only admin session or guild owner can override closed poll responses
     if session.get("type") != "admin":
         return RedirectResponse(f"/guild/{guild_id}/polls", status_code=303)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     poll = await database.get_poll(poll_id)
     if not poll or poll.get("guild_id") != guild_id:
@@ -3885,7 +3885,7 @@ async def poll_response_delete(
     if err: return err
     if session.get("type") != "admin":
         return RedirectResponse(f"/guild/{guild_id}/polls", status_code=303)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     poll = await database.get_poll(poll_id)
     if not poll or poll.get("guild_id") != guild_id:
@@ -3898,7 +3898,7 @@ async def poll_response_delete(
 async def polls_delete(request: Request, guild_id: str, poll_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     if not (session.get("type") == "admin" or await has_perm(request, guild_id, "poll_manage")):
         return RedirectResponse(f"/guild/{guild_id}/polls", status_code=303)
@@ -3913,7 +3913,7 @@ async def polls_delete(request: Request, guild_id: str, poll_id: int):
 async def guild_timer(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -3985,7 +3985,7 @@ async def map_create_share(request: Request, guild_id: str):
     """Save map state and return a short share ID (member-only or public)."""
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     import json as _json
     try:
@@ -4009,7 +4009,7 @@ async def map_create_share(request: Request, guild_id: str):
 async def map_presets_list(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     presets = await database.get_map_presets(guild_id)
     return JSONResponse({"presets": presets})
@@ -4020,7 +4020,7 @@ async def map_presets_save(request: Request, guild_id: str):
     import json as _json
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     try:
         body = await request.json()
@@ -4041,7 +4041,7 @@ async def map_presets_save(request: Request, guild_id: str):
 async def map_presets_delete(request: Request, guild_id: str, preset_id: int):
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     ok = await database.delete_map_preset(guild_id, preset_id)
     return JSONResponse({"ok": ok})
@@ -4051,7 +4051,7 @@ async def map_presets_delete(request: Request, guild_id: str, preset_id: int):
 async def map_presets_rename(request: Request, guild_id: str, preset_id: int):
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     try:
         body = await request.json()
@@ -4131,7 +4131,7 @@ async def map_public_view(request: Request, short_id: str):
 async def guild_world_settings_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
@@ -4149,7 +4149,7 @@ async def guild_world_settings_page(request: Request, guild_id: str):
 async def guild_map_set_world(request: Request, guild_id: str, server_url: str = Form(""), next_url: str = Form("")):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     url = server_url.strip().rstrip("/")
     if url and not re.match(r"^https://[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$", url):
@@ -4167,7 +4167,7 @@ async def guild_map_set_world(request: Request, guild_id: str, server_url: str =
 async def guild_map_trigger_snapshot(request: Request, guild_id: str, next_url: str = Form("")):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     tw_world = (guild.get("tw_world") or "").strip() if guild else ""
@@ -4204,7 +4204,7 @@ async def guild_map_set_timezone(request: Request, guild_id: str,
                                   server_utc_offset: int = Form(60)):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     offset = max(-720, min(840, server_utc_offset))  # clamp to valid UTC range
     await database.update_guild_config_fields(guild_id, server_utc_offset=offset)
@@ -4216,7 +4216,7 @@ async def sector_monitor_page(request: Request, guild_id: str):
     """Show sector monitor config + alert list."""
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
@@ -4269,7 +4269,7 @@ async def sector_monitor_page(request: Request, guild_id: str):
 async def sector_monitor_save(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     form = await request.form()
     def _fi(k, d):
@@ -4297,7 +4297,7 @@ async def sector_monitor_save(request: Request, guild_id: str):
 async def sector_monitor_save_live_session(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "auth"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     body = await request.json()
     cookie = (body.get("cookie") or "").strip()
@@ -4337,7 +4337,7 @@ async def sector_monitor_save_live_session(request: Request, guild_id: str):
 async def sector_monitor_scan(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     new_alerts = await database.run_sector_scan(guild_id)
     return RedirectResponse(
@@ -4350,7 +4350,7 @@ async def sector_monitor_scan(request: Request, guild_id: str):
 async def sector_monitor_dismiss(request: Request, guild_id: str, alert_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.dismiss_sector_alert(guild_id, alert_id)
     return RedirectResponse(f"/guild/{guild_id}/map/sector-monitor", status_code=303)
@@ -4360,7 +4360,7 @@ async def sector_monitor_dismiss(request: Request, guild_id: str, alert_id: int)
 async def sector_monitor_dismiss_all(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.dismiss_all_sector_alerts(guild_id)
     return RedirectResponse(f"/guild/{guild_id}/map/sector-monitor", status_code=303)
@@ -4494,7 +4494,7 @@ async def guild_map_heatmap_data(request: Request, guild_id: str):
     """Return farmlist resource data for heatmap overlay."""
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=403)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     uid = session.get("uid", "")
     data = await database.get_farmlist_heatmap(guild_id, uid)
@@ -4607,7 +4607,7 @@ def _stripe_client():
 async def setup_save_world(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return JSONResponse({"ok": False, "error": "Not authenticated"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
     body = await request.json()
     url = (body.get("server_url") or "").strip().rstrip("/")
@@ -4623,7 +4623,7 @@ async def setup_save_world(request: Request, guild_id: str):
 async def setup_trigger_snapshot(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return JSONResponse({"ok": False, "error": "Not authenticated"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
     guild = await database.get_guild(guild_id)
     tw_world = (guild.get("tw_world") or "").strip() if guild else ""
@@ -4641,7 +4641,7 @@ async def setup_trigger_snapshot(request: Request, guild_id: str):
 async def guild_setup_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -4672,7 +4672,7 @@ async def guild_setup_page(request: Request, guild_id: str):
 async def guild_settings_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -4713,7 +4713,7 @@ async def bot_settings_page(request: Request, guild_id: str):
     """Legacy URL — Bot Settings is now an in-page tab on My Ally."""
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -4730,7 +4730,7 @@ async def bot_settings_page(request: Request, guild_id: str):
 async def bot_settings_language(request: Request, guild_id: str, bot_language: str = Form("de")):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     if bot_language not in ("de", "en"):
         bot_language = "de"
@@ -4742,7 +4742,7 @@ async def bot_settings_language(request: Request, guild_id: str, bot_language: s
 async def upgrade_page(request: Request, guild_id: str, plan: str = ""):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -4772,7 +4772,7 @@ async def upgrade_page(request: Request, guild_id: str, plan: str = ""):
 async def tutorial_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -4788,7 +4788,7 @@ async def tutorial_page(request: Request, guild_id: str):
 async def how_to_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -4808,7 +4808,7 @@ async def how_to_page(request: Request, guild_id: str):
 async def billing_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -4852,7 +4852,7 @@ async def billing_checkout(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     s = _stripe_client()
     if not s:
@@ -4898,7 +4898,7 @@ async def billing_checkout(
 async def billing_success(request: Request, guild_id: str, session_id: str = ""):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     s = _stripe_client()
     if not s or not session_id:
@@ -4941,7 +4941,7 @@ async def remove_bot(request: Request, guild_id: str):
     """Owner removes the bot from their server — frees the subscription slot."""
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -4970,7 +4970,7 @@ async def remove_bot(request: Request, guild_id: str):
 async def billing_portal(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     s = _stripe_client()
     if not s:
@@ -4992,7 +4992,7 @@ async def billing_cancel(request: Request, guild_id: str):
     """Cancel the guild subscription at period end."""
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -5803,7 +5803,7 @@ def _enrich_own_villages(own_villages: list) -> list:
 async def my_account_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -5910,7 +5910,7 @@ async def my_account_upload(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -5993,7 +5993,7 @@ async def my_account_set_scout_village(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     discord_id = session.get("uid", "") or session.get("discord_id", "")
     await database.set_scout_village(guild_id, discord_id, x, y)
@@ -6011,7 +6011,7 @@ async def save_march_settings(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     discord_id = session.get("uid", "")
     await database.save_march_settings(
@@ -6028,7 +6028,7 @@ async def save_march_settings(
 async def my_account_clear(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -6054,7 +6054,7 @@ async def save_sitters(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.save_account_sitters(guild_id, session.get("uid", ""), {
         "sitter1_name": sitter1_name or None,
@@ -6074,7 +6074,7 @@ async def save_sitters(
 async def kampfkraft_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -6135,7 +6135,7 @@ async def attacks_config(request: Request, guild_id: str,
                           attack_channel_id: str = Form("")):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.set_attack_channel_web(guild_id, attack_channel_id.strip())
     return RedirectResponse(f"/guild/{guild_id}/attacks?saved=1", status_code=303)
@@ -6145,7 +6145,7 @@ async def attacks_config(request: Request, guild_id: str,
 async def attacks_auto_setup(request: Request, guild_id: str, next: str = Form("")):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -6168,7 +6168,7 @@ async def attacks_auto_setup(request: Request, guild_id: str, next: str = Form("
 async def attacks_reset(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.set_attack_channel_web(guild_id, "")
     return RedirectResponse(f"/guild/{guild_id}/attacks?saved=1", status_code=303)
@@ -6178,7 +6178,7 @@ async def attacks_reset(request: Request, guild_id: str):
 async def attack_analysis_page(request: Request, guild_id: str, report_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -6195,7 +6195,7 @@ async def attack_analysis_page(request: Request, guild_id: str, report_id: int):
 async def attacks_delete_report(request: Request, guild_id: str, report_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     is_admin = session.get("type") == "admin" or session.get("uid") == (guild or {}).get("owner_discord_id")
@@ -6762,7 +6762,7 @@ async def attacks_bulk_delete(request: Request, guild_id: str):
 async def attacks_api_analysis(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return JSONResponse({"ok": False}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"ok": False}, status_code=403)
     data = await database.get_attack_analysis(guild_id)
     return JSONResponse({"ok": True, **data})
@@ -6831,7 +6831,7 @@ async def guild_api_player_info(request: Request, guild_id: str, player: str = "
     session, err = _require_session(request)
     if err:
         return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err:
         return JSONResponse({"error": "forbidden"}, status_code=403)
     if not player:
@@ -6943,7 +6943,7 @@ async def allianz_sitter_liste(request: Request, guild_id: str):
 async def settle_list_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -6971,7 +6971,7 @@ async def settle_list_add(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -6996,7 +6996,7 @@ async def settle_list_add(
 async def settle_list_delete(request: Request, guild_id: str, entry_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -7014,7 +7014,7 @@ async def settle_list_delete(request: Request, guild_id: str, entry_id: int):
 async def dual_create(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -7031,7 +7031,7 @@ async def dual_create(request: Request, guild_id: str):
 async def dual_revoke(request: Request, guild_id: str, token: str = Form(...)):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.revoke_dual_link(token, session.get("uid", ""))
     return RedirectResponse(f"/guild/{guild_id}/my-account", status_code=303)
@@ -7295,7 +7295,7 @@ async def my_ally_page(request: Request, guild_id: str):
 async def my_ally_create(request: Request, guild_id: str, ally_name: str = Form(...)):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid", "")
     # 1 per server: check if ANY group exists for this guild
@@ -7310,7 +7310,7 @@ async def my_ally_create(request: Request, guild_id: str, ally_name: str = Form(
 async def my_ally_delete(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid", "")
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
@@ -7328,7 +7328,7 @@ async def my_ally_settings(request: Request, guild_id: str,
                              lock_travian_name: str = Form("0")):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid", "")
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
@@ -7351,7 +7351,7 @@ async def meta_alliance_add(request: Request, guild_id: str,
                              color: str = Form("#94a3b8")):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     name = alliance_name.strip()[:80]
     if name:
@@ -7364,7 +7364,7 @@ async def meta_alliance_remove(request: Request, guild_id: str,
                                 alliance_name: str = Form("")):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.remove_meta_alliance(guild_id, alliance_name)
     return RedirectResponse(f"/guild/{guild_id}/my-ally?flash=saved#map", status_code=303)
@@ -7538,7 +7538,7 @@ async def my_ally_save_server_end(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid", "")
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
@@ -7608,7 +7608,7 @@ async def my_ally_post_server_end_discord(request: Request, guild_id: str):
     """Manually trigger a post/update of the countdown embed."""
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid", "")
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
@@ -7731,7 +7731,7 @@ async def api_server_end(request: Request, guild_id: str):
 async def my_ally_regen_token(request: Request, guild_id: str, which: str = Form("main")):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid", "")
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
@@ -7753,7 +7753,7 @@ async def my_ally_roles_reorder(request: Request, guild_id: str):
     """AJAX endpoint: reorder roles via drag & drop."""
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     uid = session.get("uid", "")
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
@@ -7774,7 +7774,7 @@ async def my_ally_role_create(request: Request, guild_id: str,
                                role_name: str = Form(...), color: str = Form("#94a3b8")):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid", "")
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
@@ -7788,7 +7788,7 @@ async def my_ally_role_create(request: Request, guild_id: str,
 async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid", "")
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
@@ -7846,7 +7846,7 @@ async def my_ally_role_update(request: Request, guild_id: str, role_id: int):
 async def my_ally_role_delete(request: Request, guild_id: str, role_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid", "")
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
@@ -7863,7 +7863,7 @@ async def bg_create(request: Request, guild_id: str,
                     name: str = Form(...), color: str = Form("#6366f1"), description: str = Form("")):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid","")
     ag = await database.get_ally_group_for_owner(guild_id, uid)
@@ -7877,7 +7877,7 @@ async def bg_update(request: Request, guild_id: str, bg_id: int,
                     name: str = Form(...), color: str = Form("#6366f1"), description: str = Form("")):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid","")
     ag = await database.get_ally_group_for_owner(guild_id, uid)
@@ -7890,7 +7890,7 @@ async def bg_update(request: Request, guild_id: str, bg_id: int,
 async def bg_set_members(request: Request, guild_id: str, bg_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid","")
     ag = await database.get_ally_group_for_owner(guild_id, uid)
@@ -7905,7 +7905,7 @@ async def bg_set_members(request: Request, guild_id: str, bg_id: int):
 async def bg_delete(request: Request, guild_id: str, bg_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid","")
     ag = await database.get_ally_group_for_owner(guild_id, uid)
@@ -7920,7 +7920,7 @@ async def my_ally_member_update(request: Request, guild_id: str, discord_id: str
                                  role_id: str = Form(""), wing: str = Form("0")):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid", "")
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
@@ -7935,7 +7935,7 @@ async def my_ally_member_update(request: Request, guild_id: str, discord_id: str
 async def my_ally_member_remove(request: Request, guild_id: str, discord_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid", "")
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
@@ -7997,7 +7997,7 @@ async def my_ally_set_entry_role(request: Request, guild_id: str):
 async def my_ally_troop_roles_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard", status_code=303)
@@ -8047,7 +8047,7 @@ async def _require_ally_owner(request: Request, guild_id: str):
     """Return (ally_group, None) or (None, redirect) — owner or ally_manage only."""
     session, err = _require_session(request)
     if err: return None, err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return None, err
     uid = session.get("uid", "")
     ally_group = await database.get_ally_group_for_owner(guild_id, uid)
@@ -9212,7 +9212,7 @@ async def _attach_farm_coords(guild_id: str, farms: list[dict]) -> None:
 async def farmlist_analyst_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -9241,7 +9241,7 @@ async def farmlist_analyst_post(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -9372,7 +9372,7 @@ async def farmlist_analyst_score_settings(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     good = max(0, farmlist_score_good)
     ok = max(0, farmlist_score_ok)
@@ -9418,7 +9418,7 @@ async def farming_inactive_search(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -9535,7 +9535,7 @@ async def farming_page(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -9940,7 +9940,7 @@ async def farming_import_farmlist(
     """Import a farmlist paste directly from the farming intelligence page."""
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
@@ -9996,7 +9996,7 @@ async def farming_score_settings(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     # Clamp to sane 0-100 range and ensure good > ok
     good = max(0, min(100, farm_score_good))
@@ -10011,7 +10011,7 @@ async def farming_score_settings(
 async def farming_snapshot(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     err = await _require_premium(guild, guild_id)
@@ -10032,7 +10032,7 @@ async def farming_snapshot(request: Request, guild_id: str):
 async def farming_snapshots_clear(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.clear_all_snapshots(guild_id)
     return RedirectResponse(f"/guild/{guild_id}/farming?saved=snapshots_cleared", status_code=303)
@@ -10052,7 +10052,7 @@ async def farming_farmlist_add(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     pop_int = None
     if population.strip().isdigit():
@@ -10073,7 +10073,7 @@ async def farming_farmlist_add(
 async def farming_farmlist_delete(request: Request, guild_id: str, entry_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.delete_farm_list_entry(guild_id, entry_id)
     return RedirectResponse(f"/guild/{guild_id}/farming?tab=myfarms&saved=deleted", status_code=303)
@@ -10085,7 +10085,7 @@ async def farming_farmlist_delete(request: Request, guild_id: str, entry_id: int
 async def einsatz_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     err = await _require_premium(guild, guild_id)
@@ -10119,7 +10119,7 @@ async def einsatz_create(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     if wave_type not in ("attack", "raid", "reinforce", "spy"):
         wave_type = "attack"
@@ -10145,7 +10145,7 @@ async def einsatz_create(
 async def einsatz_delete(request: Request, guild_id: str, plan_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.delete_attack_plan(guild_id, plan_id)
     return RedirectResponse(f"/guild/{guild_id}/einsatz", status_code=303)
@@ -10163,7 +10163,7 @@ async def _op_api_guard(request: Request, guild_id: str, check_alliance: bool = 
     session, err = _require_session(request)
     if err:
         return None, JSONResponse({"error": "not_logged_in"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err:
         return None, JSONResponse({"error": "no_access"}, status_code=403)
     if check_alliance:
@@ -10178,7 +10178,7 @@ async def _op_api_guard(request: Request, guild_id: str, check_alliance: bool = 
 async def operations_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild: return RedirectResponse("/dashboard")
@@ -10812,7 +10812,7 @@ async def my_operations_page(request: Request, guild_id: str):
     """Player-facing op plan view — only shows waves assigned to the logged-in user."""
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -10847,7 +10847,7 @@ async def op_live_popup(request: Request, guild_id: str, plan_id: int):
     """Standalone live board popup — detachable window, auto-refreshes every 5s."""
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     plan = await database.get_op_plan(plan_id, guild_id)
     if not plan:
@@ -10866,7 +10866,7 @@ async def op_map_popup(request: Request, guild_id: str, plan_id: int):
     """Standalone map window — no nav, just the canvas + auto-refresh."""
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -11511,7 +11511,7 @@ async def op_my_missions(request: Request, guild_id: str):
 async def notifications_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -11532,7 +11532,7 @@ async def notifications_page(request: Request, guild_id: str):
 async def notifications_clear(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid", "")
     await database.mark_notifications_read(guild_id, uid)
@@ -11543,7 +11543,7 @@ async def notifications_clear(request: Request, guild_id: str):
 async def notifications_unread_count(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return JSONResponse({"count": 0})
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"count": 0})
     count = await database.count_unread_notifications(guild_id, session.get("uid", ""))
     return JSONResponse({"count": count})
@@ -13071,7 +13071,7 @@ async def api_def_crop_save(request: Request):
 async def api_def_crop_my(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     discord_id = session.get("uid", "")
     sends = await database.get_def_crop_sends(guild_id, discord_id)
@@ -13082,7 +13082,7 @@ async def api_def_crop_my(request: Request, guild_id: str):
 async def api_def_crop_deactivate(request: Request, guild_id: str, send_id: int):
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     await database.deactivate_def_crop_send(send_id, guild_id)
     return JSONResponse({"ok": True})
@@ -13616,7 +13616,7 @@ async def enemies_page(request: Request, guild_id: str, saved: str = ""):
 async def enemy_detail(request: Request, guild_id: str, player_name: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -13730,7 +13730,7 @@ async def create_report_channel(request: Request, guild_id: str):
 async def create_request_hub(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     try:
         async with httpx.AsyncClient(timeout=15) as client:
@@ -13752,7 +13752,7 @@ async def create_request_hub(request: Request, guild_id: str):
 async def refresh_request_hub(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     try:
         async with httpx.AsyncClient(timeout=15) as client:
@@ -13772,7 +13772,7 @@ async def refresh_request_hub(request: Request, guild_id: str):
 async def clear_request_hub(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.clear_request_hub(guild_id)
     return RedirectResponse(f"/guild/{guild_id}/my-ally?saved=hub_cleared#bot-settings", status_code=303)
@@ -13806,7 +13806,7 @@ async def clear_stale_channels(request: Request, guild_id: str):
     """Remove DB entries for channels that no longer exist in Discord."""
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     # Ask bot which channels are stale
     try:
@@ -14050,7 +14050,7 @@ async def api_save_dc_grain_sim(request: Request, guild_id: str):
     """Save a grain simulation snapshot for a def-call channel."""
     session, err = _require_session(request)
     if err: return JSONResponse({"ok": False}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"ok": False}, status_code=403)
     uid = session.get("uid", "")
     data = await request.json()
@@ -14083,7 +14083,7 @@ async def api_get_dc_grain_sims(request: Request, guild_id: str, channel_id: str
     """
     session, err = _require_session(request)
     if err: return JSONResponse({"ok": False}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"ok": False}, status_code=403)
     uid = session.get("uid", "")
 
@@ -14273,7 +14273,7 @@ async def enemy_delete(request: Request, guild_id: str, player_name: str):
 async def alliance_members_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -14342,7 +14342,7 @@ async def alliance_members_page(request: Request, guild_id: str):
 async def settings_set_tw_alliance(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return JSONResponse({"ok": False}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"ok": False}, status_code=403)
     body = await request.json()
     name = (body.get("tw_alliance_name") or "").strip()
@@ -14359,7 +14359,7 @@ async def alliance_members_set_alliance(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.set_tw_alliance_name(guild_id, alliance_name)
     count = await database.sync_alliance_members_from_snapshot(guild_id)
@@ -14377,7 +14377,7 @@ async def alliance_members_import(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
 
     parsed = parse_alliance_members(members_text)
@@ -14395,7 +14395,7 @@ async def alliance_player_detail(request: Request, guild_id: str, player_name: s
     """JSON endpoint: village list + growth for a single player from map snapshots."""
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
 
     import aiosqlite as _aio
@@ -14494,7 +14494,7 @@ async def set_member_note(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     # Sanitise
     player_name = player_name.strip()[:100]
@@ -14517,7 +14517,7 @@ def _meta_redirect_target(guild_id: str, redirect_to: str) -> str:
 async def meta_create(request: Request, guild_id: str, meta_name: str = Form(""), redirect_to: str = Form("")):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     target = _meta_redirect_target(guild_id, redirect_to)
     meta_name = meta_name.strip()[:64]
@@ -14535,7 +14535,7 @@ async def meta_create(request: Request, guild_id: str, meta_name: str = Form("")
 async def meta_delete(request: Request, guild_id: str, group_id: int, redirect_to: str = Form("")):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.delete_meta_group(guild_id, group_id)
     return RedirectResponse(_meta_redirect_target(guild_id, redirect_to), status_code=303)
@@ -14547,7 +14547,7 @@ async def meta_add_alliance(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     if alliance_name:
         await database.add_alliance_to_meta(guild_id, group_id, alliance_name)
@@ -14560,7 +14560,7 @@ async def meta_remove_alliance(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     if alliance_name:
         await database.remove_alliance_from_meta(guild_id, group_id, alliance_name)
@@ -14571,7 +14571,7 @@ async def meta_remove_alliance(
 async def meta_group_stats(request: Request, guild_id: str, group_id: int):
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     stats = await database.get_meta_group_stats(guild_id, group_id)
     return JSONResponse({"stats": stats})
@@ -14581,7 +14581,7 @@ async def meta_group_stats(request: Request, guild_id: str, group_id: int):
 async def meta_group_members(request: Request, guild_id: str, group_id: int):
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     data = await database.get_meta_group_members(guild_id, group_id)
     return JSONResponse(data)
@@ -14591,7 +14591,7 @@ async def meta_group_members(request: Request, guild_id: str, group_id: int):
 async def alliance_members_clear(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     async with __import__('aiosqlite').connect(database.DB_PATH) as db:
         await db.execute("DELETE FROM alliance_members WHERE guild_id = ?", (guild_id,))
@@ -14652,7 +14652,7 @@ async def blueprints_main(request: Request, guild_id: str):
 async def blueprint_template_new_form(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -14676,7 +14676,7 @@ async def blueprint_template_new_save(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     err = await _require_premium(guild, guild_id)
@@ -14691,7 +14691,7 @@ async def blueprint_template_new_save(
 async def blueprint_template_edit(request: Request, guild_id: str, template_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -14721,7 +14721,7 @@ async def blueprint_step_add(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     err = await _require_premium(guild, guild_id)
@@ -14741,7 +14741,7 @@ async def blueprint_step_add(
 async def blueprint_step_delete(request: Request, guild_id: str, template_id: int, step_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     err = await _require_premium(guild, guild_id)
@@ -14755,7 +14755,7 @@ async def blueprint_step_delete(request: Request, guild_id: str, template_id: in
 async def blueprint_template_delete(request: Request, guild_id: str, template_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     err = await _require_premium(guild, guild_id)
@@ -14775,7 +14775,7 @@ async def blueprint_player_new(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     err = await _require_premium(guild, guild_id)
@@ -14813,7 +14813,7 @@ async def blueprint_self_activate(
 async def blueprint_player_delete(request: Request, guild_id: str, blueprint_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     err = await _require_premium(guild, guild_id)
@@ -14826,7 +14826,7 @@ async def blueprint_player_delete(request: Request, guild_id: str, blueprint_id:
 async def blueprint_player_detail(request: Request, guild_id: str, blueprint_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -14852,7 +14852,7 @@ async def blueprint_player_detail(request: Request, guild_id: str, blueprint_id:
 async def blueprint_step_toggle(request: Request, guild_id: str, blueprint_id: int, step_id: int):
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     new_state = await database.toggle_blueprint_step(blueprint_id, step_id)
     return JSONResponse({"completed": new_state})
@@ -14902,7 +14902,7 @@ async def blueprint_import_preset(request: Request, guild_id: str):
 async def village_layouts_list(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -14924,7 +14924,7 @@ async def village_layouts_list(request: Request, guild_id: str):
 async def village_layout_new_form(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -14950,7 +14950,7 @@ async def village_layout_new_save(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -14967,7 +14967,7 @@ async def village_layout_new_save(
 async def village_layout_editor(request: Request, guild_id: str, layout_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -14991,7 +14991,7 @@ async def village_layout_editor(request: Request, guild_id: str, layout_id: int)
 async def village_layout_set_slot(request: Request, guild_id: str, layout_id: int):
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     body = await request.json()
     slot_num      = int(body.get("slot_num", 0))
@@ -15011,7 +15011,7 @@ async def village_layout_set_slot(request: Request, guild_id: str, layout_id: in
 async def village_layout_delete_slot(request: Request, guild_id: str, layout_id: int):
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     body = await request.json()
     slot_id = int(body.get("slot_id", 0))
@@ -15023,7 +15023,7 @@ async def village_layout_delete_slot(request: Request, guild_id: str, layout_id:
 async def village_layout_clear_slot(request: Request, guild_id: str, layout_id: int):
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     body = await request.json()
     slot_num = int(body.get("slot_num", 0))
@@ -15035,7 +15035,7 @@ async def village_layout_clear_slot(request: Request, guild_id: str, layout_id: 
 async def village_layout_delete(request: Request, guild_id: str, layout_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.delete_village_layout(guild_id, layout_id)
     return RedirectResponse(f"/guild/{guild_id}/blueprints/layouts", status_code=303)
@@ -15049,7 +15049,7 @@ async def village_layout_delete(request: Request, guild_id: str, layout_id: int)
 async def hero_tasks_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -15246,7 +15246,7 @@ async def hero_scout_detail(request: Request, guild_id: str, player_name: str):
 async def hero_scout_set_channel(request: Request, guild_id: str, channel_id: str = Form("")):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
 
     bot_api = os.environ.get("BOT_API_URL", "http://bot:7777")
@@ -15271,7 +15271,7 @@ async def hero_scout_set_channel(request: Request, guild_id: str, channel_id: st
 async def hero_scout_library_status(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return JSONResponse({"ok": False, "error": "auth"})
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"ok": False, "error": "guild"})
     bot_api = os.environ.get("BOT_API_URL", "http://bot:7777")
     try:
@@ -15286,7 +15286,7 @@ async def hero_scout_library_status(request: Request, guild_id: str):
 async def hero_scout_build_library(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return JSONResponse({"ok": False, "error": "auth"})
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"ok": False, "error": "guild"})
     guild = await database.get_guild(guild_id)
     world_url = guild.get("tw_world", "") if guild else ""
@@ -15306,7 +15306,7 @@ async def hero_scout_build_library(request: Request, guild_id: str):
 async def hero_scout_slot_image(request: Request, guild_id: str, entry_id: int, slot_name: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
 
     path = HERO_SCOUT_IMAGES_DIR / guild_id / str(entry_id) / f"{slot_name}.png"
@@ -15535,7 +15535,7 @@ async def _init_manual_hero_table():
 async def hero_scout_manual_new(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -15562,7 +15562,7 @@ async def hero_scout_manual_add_version(request: Request, guild_id: str, player_
     player_name = unquote(player_name)
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -15611,7 +15611,7 @@ async def hero_scout_entry_edit(request: Request, guild_id: str, entry_id: int):
     """Edit a specific hero scout entry by ID."""
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -15677,7 +15677,7 @@ async def hero_scout_manual_save(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await _init_manual_hero_table()
 
@@ -15757,7 +15757,7 @@ async def hero_scout_delete_player(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
 
     import aiosqlite, shutil
@@ -15791,7 +15791,7 @@ async def hero_scout_delete_player(
 async def hero_scout_delete_all(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
 
     import aiosqlite, shutil
@@ -15815,7 +15815,7 @@ async def hero_scout_delete_all(request: Request, guild_id: str):
 async def crop_calculator_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -15831,7 +15831,7 @@ async def crop_calculator_page(request: Request, guild_id: str):
 async def crop_supply_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -15851,7 +15851,7 @@ async def crop_supply_page(request: Request, guild_id: str):
 async def grain_simulations_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     if not await has_perm(request, guild_id, "grain_sim_view"):
         return HTMLResponse("Kein Zugriff — Rolle 'grain_sim_view' erforderlich.", status_code=403)
@@ -15872,7 +15872,7 @@ async def grain_simulations_page(request: Request, guild_id: str):
 async def grain_simulation_save(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid", "")
     username = session.get("username", "") or session.get("global_name", "") or uid
@@ -15898,7 +15898,7 @@ async def grain_simulation_save(request: Request, guild_id: str):
 async def grain_simulation_delete(request: Request, guild_id: str, sim_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     uid = session.get("uid", "")
     is_manager = await has_perm(request, guild_id, "ally_manage")
@@ -15912,7 +15912,7 @@ async def grain_simulation_delete(request: Request, guild_id: str, sim_id: int):
 async def grain_simulation_load(request: Request, guild_id: str, sim_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     if not await has_perm(request, guild_id, "grain_sim_view"):
         return HTMLResponse("Kein Zugriff.", status_code=403)
@@ -15966,7 +15966,7 @@ def _minutes_since(iso: str) -> float | None:
 async def travian_stats_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -16006,7 +16006,7 @@ async def travian_stats_import(request: Request, guild_id: str):
     from stats_parser import parse_travian_stats_smart
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     form = await request.form()
     raw_text    = (form.get("stats_text") or "").strip()
@@ -16048,7 +16048,7 @@ async def travian_stats_import(request: Request, guild_id: str):
 async def travian_stats_delete(request: Request, guild_id: str, snap_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.delete_stats_snapshot(snap_id, guild_id)
     return RedirectResponse(f"/guild/{guild_id}/travian-stats?flash=deleted", status_code=303)
@@ -16058,7 +16058,7 @@ async def travian_stats_delete(request: Request, guild_id: str, snap_id: int):
 async def travian_stats_trends_api(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "unauthorized"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     stats_type = request.query_params.get("type", "player")
     data = await database.get_stats_trend_data(guild_id, stats_type=stats_type)
@@ -16326,7 +16326,7 @@ async def report_delete(request: Request, guild_id: str, report_id: int):
 async def player_intel_page(request: Request, guild_id: str, q: str = ""):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -16443,7 +16443,7 @@ async def guild_set_world_inline(request: Request, guild_id: str):
     """Quick-setup endpoint: save tw_world URL without visiting the admin page."""
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "Not authenticated"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "Access denied"}, status_code=403)
     # Allow: platform admin, Discord guild admin, or personal workspace owner
     is_platform_admin = _get_is_admin(request)
@@ -16549,7 +16549,7 @@ async def player_intel_public_view(request: Request, short_id: str):
 async def scout_incidents_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     guild = await database.get_guild(guild_id)
     if not guild:
@@ -16573,7 +16573,7 @@ async def scout_incidents_page(request: Request, guild_id: str):
 async def delete_scout_incident(request: Request, guild_id: str, incident_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     async with __import__("aiosqlite").connect(database.DB_PATH) as db:
         await db.execute("DELETE FROM scout_incidents WHERE id=? AND guild_id=?", (incident_id, guild_id))
@@ -16599,7 +16599,7 @@ ALLIANCE_BONUS_DEFS = [
 async def alliance_bonuses_page(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     if guild_id.startswith("ws_"):
         real_guild_id = await database.get_ally_membership_guild_id(session.get("discord_id", ""))
@@ -16643,7 +16643,7 @@ async def alliance_bonuses_page(request: Request, guild_id: str):
 async def alliance_bonuses_save(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     if not await has_perm(request, guild_id, "ally_manage"):
         uid = session.get("uid", "") or session.get("discord_id", "")
@@ -16666,7 +16666,7 @@ async def alliance_bonuses_save(request: Request, guild_id: str):
 async def alliance_bonuses_save_enabled(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "auth"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     uid = session.get("uid", "") or session.get("discord_id", "")
     ally_group = await database.get_ally_group_for_guild(guild_id)
@@ -16692,7 +16692,7 @@ async def alliance_bonuses_save_enabled(request: Request, guild_id: str):
 async def alliance_bonuses_save_order(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "auth"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     uid = session.get("uid", "") or session.get("discord_id", "")
     ally_group = await database.get_ally_group_for_guild(guild_id)
@@ -16784,7 +16784,7 @@ async def alliance_bonuses_save_json(request: Request, guild_id: str):
     """JSON endpoint for inline timeline drag-to-set."""
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "auth"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     uid = session.get("uid", "") or session.get("discord_id", "")
     ally_group = await database.get_ally_group_for_guild(guild_id)
@@ -16810,7 +16810,7 @@ async def toggle_bonus_role(request: Request, guild_id: str, role_id: str):
     """Toggle a Discord role in the ally-bonuses channel's role_ids list."""
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "auth"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     if not SNOWFLAKE_RE.match(role_id):
         return JSONResponse({"error": "invalid role_id"}, status_code=400)
@@ -16837,7 +16837,7 @@ async def toggle_bonus_role(request: Request, guild_id: str, role_id: str):
 async def alliance_bonuses_channel_settings_get(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "auth"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     ally_group = await database.get_ally_group_for_guild(guild_id)
     if not ally_group:
@@ -16872,7 +16872,7 @@ async def alliance_bonuses_channel_settings_get(request: Request, guild_id: str)
 async def alliance_bonuses_channel_settings_save(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return JSONResponse({"error": "auth"}, status_code=401)
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return JSONResponse({"error": "forbidden"}, status_code=403)
     uid = session.get("uid", "") or session.get("discord_id", "")
     ally_group = await database.get_ally_group_for_guild(guild_id)
