@@ -454,6 +454,7 @@
         <button onclick="bulkLabel('no_hero')"  class="btn btn-secondary" style="font-size:.68rem;padding:.18rem .45rem;border-color:rgba(251,146,60,.3);color:#fb923c;">🚫 Hero</button>
         <button onclick="bulkLabel('')"         class="btn btn-secondary" style="font-size:.68rem;padding:.18rem .45rem;">✕</button>
         <div style="height:14px;width:1px;background:var(--border);"></div>
+        <button onclick="bulkHide()"    class="btn btn-secondary" style="font-size:.68rem;padding:.18rem .45rem;color:#94a3b8;">🙈</button>
         <button onclick="bulkArchive()" class="btn btn-secondary" style="font-size:.68rem;padding:.18rem .45rem;">📁</button>
         <button onclick="bulkDelete()"  class="btn btn-secondary" style="font-size:.68rem;padding:.18rem .45rem;color:#f87171;">🗑</button>
         <button onclick="clearSelection()" style="margin-left:auto;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.9rem;line-height:1;">&times;</button>
@@ -2043,6 +2044,14 @@
     const hasNote = !!(a.notes && a.notes.trim());
     const noteDot = hasNote ? `<span style="width:5px;height:5px;border-radius:50%;background:#fbbf24;display:inline-block;" data-tip="Has note"></span>` : '';
 
+    const matchedDef = _activeDefCalls.find(dc =>
+      (dc.coords && a.defender_coords && dc.coords === a.defender_coords) ||
+      (dc.arrival_time && a.arrival_time && dc.arrival_time === a.arrival_time)
+    );
+    const defBadge = matchedDef
+      ? `<span style="font-size:.6rem;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:#4ade80;border-radius:4px;padding:0 3px;font-weight:700;" title="Def-Call aktiv">🛡️</span>`
+      : '';
+
     return `
       <div class="atk-row${lblClass}${_selectedAttackId===a.id?' atk-active':''}" data-id="${a.id}" data-label="${lbl}"
            style="display:flex;align-items:center;gap:.25rem;padding:.15rem .45rem;border-bottom:1px solid rgba(255,255,255,.025);cursor:pointer;flex-wrap:nowrap;"
@@ -2052,6 +2061,7 @@
         ${typeBadge(a.attack_type)}
         <span style="font-weight:600;font-size:.66rem;color:#60a5fa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100px;">${escHtml(a.attacker_player)}</span>
         ${a.has_artifact ? '<span style="font-size:.55rem;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.3);color:#fbbf24;border-radius:4px;padding:0 3px;font-weight:700;" title="'+escHtml(a.artifact_name||'')+'">🏺</span>' : ''}
+        ${defBadge}
         <span style="flex:1;min-width:0;"></span>
         ${troopShort}
         ${labelBadge(lbl)}
@@ -2447,6 +2457,17 @@
       } catch(e) {}
     }
     showToast('✅ ' + done + ' attack(s) labeled as ' + (label||'none') + '.');
+    clearSelection();
+  };
+
+  window.bulkHide = function() {
+    const ids = [..._selectedIds];
+    if (!ids.length) return;
+    for (const id of ids) {
+      const row = document.querySelector('[data-id="'+id+'"]');
+      if (row) row.style.display = 'none';
+    }
+    showToast('🙈 ' + ids.length + ' attack(s) hidden from view.');
     clearSelection();
   };
 
@@ -3402,6 +3423,8 @@ function _renderFlowDiagram() {
   el.innerHTML = html || '<span style="font-size:.8rem;color:var(--text-muted);">Keine Daten</span>';
 }
 
+let _activeDefCalls = [];
+
 async function _loadDefCallsOverview() {
   const el = document.getElementById('defCallsOverview');
   if (!el) return;
@@ -3409,6 +3432,7 @@ async function _loadDefCallsOverview() {
   try {
     const r = await fetch(`/guild/${window.GUILD_ID}/attacks/api/def-calls`);
     const calls = await r.json();
+    _activeDefCalls = calls;
     if (!calls.length) {
       el.innerHTML = '<span style="font-size:.8rem;color:var(--text-muted);">Keine aktiven Def-Calls</span>';
       return;

@@ -15597,6 +15597,55 @@ async def hero_scout_manual_add_version(request: Request, guild_id: str, player_
     })
 
 
+@app.get("/guild/{guild_id}/defense/hero-scout/entry/{entry_id}/edit", response_class=HTMLResponse)
+async def hero_scout_entry_edit(request: Request, guild_id: str, entry_id: int):
+    """Edit a specific hero scout entry by ID."""
+    session, err = _require_session(request)
+    if err: return err
+    err = _require_guild(session, guild_id)
+    if err: return err
+    guild = await database.get_guild(guild_id)
+    if not guild:
+        return RedirectResponse("/dashboard", status_code=303)
+    await _init_manual_hero_table()
+
+    import aiosqlite
+    db_path = Path("/app/data/scouter.db")
+    prefill: dict = {}
+    prefill_slots: dict = {}
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM hero_scout_entries WHERE id=? AND guild_id=?", (entry_id, guild_id)
+        ) as cur:
+            row = await cur.fetchone()
+            if row:
+                prefill = dict(row)
+        if prefill.get("id"):
+            async with db.execute(
+                "SELECT slot_name, item_name FROM hero_scout_slots WHERE entry_id=? ORDER BY slot_index",
+                (prefill["id"],)
+            ) as cur:
+                for r in await cur.fetchall():
+                    prefill_slots[r["slot_name"]] = r["item_name"]
+    if not prefill:
+        return RedirectResponse(f"/guild/{guild_id}/defense/hero-scout", status_code=303)
+    prefill["slots"] = prefill_slots
+
+    return templates.TemplateResponse("hero_scout_manual.html", {
+        "request": request,
+        "guild": guild,
+        "guild_id": guild_id,
+        "items_by_cat": _HERO_ITEMS_BY_CAT,
+        "slot_names_de": _SLOT_NAMES_DE,
+        "cat_to_slot": _CAT_TO_SLOT,
+        "prefill": prefill,
+        "flash": "",
+        "edit_player": prefill.get("player_name", ""),
+        "edit_entry_id": entry_id,
+    })
+
+
 @app.post("/guild/{guild_id}/defense/hero-scout/manual/save")
 async def hero_scout_manual_save(
     request: Request,

@@ -10728,7 +10728,7 @@ async def auto_archive_past_attacks(guild_id: str) -> int:
         cur = await db.execute(
             """UPDATE incoming_attacks SET is_dismissed=1
                WHERE guild_id=? AND is_dismissed=0
-               AND arrival_time != '' AND arrival_time < datetime('now', ?)""",
+               AND arrival_time != '' AND arrival_time < datetime('now', ?, '-180 minutes')""",
             (guild_id, f"+{offset_min} minutes")
         )
         await db.commit()

@@ -197,7 +197,7 @@ def _disabled_push_view(label: str) -> discord.ui.View:
 
 class ResModal(discord.ui.Modal, title="Res-Push Request"):
     player_name = discord.ui.TextInput(label="Player Name", placeholder="Who needs the push?", max_length=100)
-    coordinates = discord.ui.TextInput(label="Coordinates", placeholder="e.g. 500|500", max_length=50)
+    coordinates = discord.ui.TextInput(label="COORDINATES!", placeholder="e.g. 500|500", max_length=50)
     push_height = discord.ui.TextInput(label="How much do you need? (total)", placeholder="e.g. 500k or 1m or 50000", max_length=20)
     reason = discord.ui.TextInput(
         label="Reason", placeholder="Why is this push needed?",
@@ -211,6 +211,14 @@ class ResModal(discord.ui.Modal, title="Res-Push Request"):
         # Validate push_height: only digits + k/m
         import re as _re
         ph = self.push_height.value.strip().lower()
+        coords_val = self.coordinates.value.strip()
+        if not _re.search(r'[|/]', coords_val):
+            await interaction.response.send_message(
+                "⚠️ **COORDINATES** must contain `|` or `/` as separator.\n"
+                "Examples: `500|500`, `−100/200`", ephemeral=True
+            )
+            return
+
         if not _re.fullmatch(r'[\d]+[km]?', ph):
             await interaction.response.send_message(
                 "⚠️ **Push Height** may only contain numbers and optionally 'k' or 'm' at the end.\n"
@@ -494,6 +502,20 @@ class ResAnswerView(discord.ui.View):
 
         push_embed = _build_push_embed(req, [], tw_world=tw_world)
         await push_channel.send(embed=push_embed, view=market_view)
+
+        # Post public web link so all channel members can view this push on TravOps
+        guild_id_str = str(interaction.guild.id)
+        web_url = f"https://travops.online/guild/{guild_id_str}/res-push"
+        link_view = discord.ui.View()
+        link_view.add_item(discord.ui.Button(
+            label="📋 View all pushes on TravOps",
+            style=discord.ButtonStyle.link,
+            url=web_url,
+        ))
+        await push_channel.send(
+            content="🔗 All res-push requests for this alliance are tracked here:",
+            view=link_view,
+        )
 
         await database.update_res_request_status(
             answer_message_id=str(interaction.message.id),

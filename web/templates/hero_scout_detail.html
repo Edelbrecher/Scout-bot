@@ -94,9 +94,13 @@
             by <strong>{{ e.reporter_name or '?' }}</strong>
           </span>
         </div>
-        <div style="text-align:right;font-size:0.78rem;color:var(--text-muted);">
-          {% if e.server_time %}<div>🕐 Server time: {{ e.server_time }}</div>{% endif %}
-          <div>Entered: {{ e.created_at[:16].replace('T',' ') }} UTC</div>
+        <div style="display:flex;align-items:flex-start;gap:.5rem;flex-direction:column;text-align:right;">
+          <a href="/guild/{{ guild.guild_id }}/defense/hero-scout/entry/{{ e.id }}/edit"
+             style="font-size:.72rem;padding:.15rem .5rem;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.3);border-radius:5px;color:#c4b5fd;text-decoration:none;white-space:nowrap;">✏️ Edit</a>
+          <div style="font-size:0.78rem;color:var(--text-muted);">
+            {% if e.server_time %}<div>🕐 Server time: {{ e.server_time }}</div>{% endif %}
+            <div>Entered: {{ e.created_at[:16].replace('T',' ') }} UTC</div>
+          </div>
         </div>
       </div>
 

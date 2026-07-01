@@ -41,7 +41,14 @@
   <div class="card" style="margin-bottom:1rem;">
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;">
       <h2 style="margin:0;" data-i18n="timer.farmlist.title">🌾 Farmlist-Timer</h2>
-      <span class="badge badge-warn" id="farmBadge" style="font-size:0.85rem; display:none;">⏳ running</span>
+      <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+        <a href="https://chromewebstore.google.com/search/Claude" target="_blank" rel="noopener"
+           style="font-size:.78rem;color:var(--text-muted);text-decoration:none;border:1px solid var(--border);border-radius:6px;padding:.2rem .6rem;white-space:nowrap;"
+           title="Install Claude in Chrome extension for background notifications">
+          🔌 Claude Chrome Extension
+        </a>
+        <span class="badge badge-warn" id="farmBadge" style="font-size:0.85rem; display:none;">⏳ running</span>
+      </div>
     </div>
 
     <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:0.75rem; align-items:end; flex-wrap:wrap;">
@@ -290,10 +297,33 @@ function farmTick() {
   }
 }
 
-function startFarm() {
-  const mins = parseInt(document.getElementById('farmInterval').value) || 20;
-  farmTotal = mins * 60 * 1000;
-  farmEnds  = Date.now() + farmTotal;
+function _saveFarmState() {
+  if (farmEnds && farmEnds > Date.now()) {
+    localStorage.setItem('farmTimerEnds',  String(farmEnds));
+    localStorage.setItem('farmTimerTotal', String(farmTotal));
+    localStorage.setItem('farmTimerInterval', document.getElementById('farmInterval').value);
+    localStorage.setItem('farmTimerWarn',     document.getElementById('farmWarn').value);
+  } else {
+    localStorage.removeItem('farmTimerEnds');
+  }
+}
+
+function _clearFarmState() {
+  localStorage.removeItem('farmTimerEnds');
+  localStorage.removeItem('farmTimerTotal');
+  localStorage.removeItem('farmTimerInterval');
+  localStorage.removeItem('farmTimerWarn');
+}
+
+function startFarm(resumeEnds) {
+  if (resumeEnds) {
+    farmEnds  = resumeEnds;
+    farmTotal = parseInt(localStorage.getItem('farmTimerTotal')) || farmEnds - Date.now();
+  } else {
+    const mins = parseInt(document.getElementById('farmInterval').value) || 20;
+    farmTotal = mins * 60 * 1000;
+    farmEnds  = Date.now() + farmTotal;
+  }
   warnFired = false;
   farmCountdown.style.color = 'var(--text)';
   farmDisplay.style.display = 'block';
@@ -304,6 +334,7 @@ function startFarm() {
   farmTick();
   farmTimer = setInterval(farmTick, 500);
   syncFarmToSW(true, farmEnds);
+  _saveFarmState();
 }
 
 btnFarmStart.addEventListener('click', () => { getAudioCtx(); startFarm(); });
@@ -314,7 +345,20 @@ btnFarmStop.addEventListener('click', () => {
   btnFarmStart.disabled = false;
   btnFarmStop.disabled  = true;
   syncFarmToSW(false);
+  _clearFarmState();
 });
+
+// Restore timer if page was left while running
+(function() {
+  const savedEnds = parseInt(localStorage.getItem('farmTimerEnds'));
+  if (savedEnds && savedEnds > Date.now()) {
+    const savedInterval = localStorage.getItem('farmTimerInterval');
+    const savedWarn     = localStorage.getItem('farmTimerWarn');
+    if (savedInterval) document.getElementById('farmInterval').value = savedInterval;
+    if (savedWarn)     document.getElementById('farmWarn').value     = savedWarn;
+    startFarm(savedEnds);
+  }
+})();
 
 // ── Custom Reminders ──────────────────────────────────────────────────────────
 let reminders = [];
@@ -449,7 +493,7 @@ renderReminders();
 // Re-sync every 20s to keep the service worker alive and schedules fresh
 setInterval(() => {
   syncToSW();
-  if (farmTimer) syncFarmToSW(true, farmEnds);
+  if (farmTimer) { syncFarmToSW(true, farmEnds); _saveFarmState(); }
 }, 20000);
 </script>
 {% endblock %}
