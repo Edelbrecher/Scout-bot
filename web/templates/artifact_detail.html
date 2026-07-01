@@ -840,13 +840,24 @@ async function saveRotation() {
       village_y:    parseInt(r.dataset.vy) || 0,
     });
   });
-  const res = await fetch(`/guild/${GUILD_ID}/artifacts/${ART_ID}/rotation/save`, {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({players})
-  });
-  if (res.ok) {
-    document.getElementById('saveRotBtn').style.display='none';
-    showToast('✅ Rotation saved');
+  console.log('[rotation] saving', players.length, 'players:', JSON.stringify(players));
+  try {
+    const res = await fetch(`/guild/${GUILD_ID}/artifacts/${ART_ID}/rotation/save`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({players})
+    });
+    const d = await res.json().catch(() => ({}));
+    console.log('[rotation] save response', res.status, d);
+    if (res.ok && d.ok) {
+      document.getElementById('saveRotBtn').style.display='none';
+      showToast('✅ Rotation saved');
+      setTimeout(() => location.reload(), 800);
+    } else {
+      showToast('Error: ' + (d.error || res.status), 'error');
+    }
+  } catch(e) {
+    console.error('[rotation] save error', e);
+    showToast('Save failed: ' + e.message, 'error');
   }
 }
 
