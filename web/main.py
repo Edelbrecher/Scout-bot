@@ -18344,11 +18344,14 @@ async def artifact_rotation_save(request: Request, guild_id: str, artifact_id: i
         return JSONResponse({"error": "forbidden"}, status_code=403)
     import json as _json
     body = await request.body()
+    print(f"[rotation/save] body={body[:200]}", flush=True)
     try:
         data = _json.loads(body)
         players = data.get("players", [])
-    except Exception:
+    except Exception as e:
+        print(f"[rotation/save] parse error: {e}", flush=True)
         players = []
+    print(f"[rotation/save] players={players}", flush=True)
     await database.save_rotation(artifact_id, guild_id, players)
 
     # If rotation is already active, reset start time so new order takes effect immediately
