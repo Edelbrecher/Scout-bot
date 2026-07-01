@@ -1820,6 +1820,54 @@ async def handle_create_rotation_channel(request: aiohttp_web.Request) -> aiohtt
         return aiohttp_web.json_response({"ok": False, "error": str(e)})
 
 
+async def handle_update_rotation_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    """Update an existing rotation channel: sync permissions to new member list, post summary."""
+    data = await request.json()
+    guild_id = data.get("guild_id")
+    channel_id = data.get("channel_id")
+    artifact_name = data.get("artifact_name", "Artifact")
+    members = data.get("members", [])  # [{player_name, discord_id}]
+
+    guild = bot.get_guild(int(guild_id))
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "Guild not found"})
+    try:
+        ch = guild.get_channel(int(channel_id))
+        if not ch:
+            return aiohttp_web.json_response({"ok": False, "error": "Channel not found"})
+
+        # Rebuild overwrites: keep bot + @everyone deny, replace member entries
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True),
+        }
+        added = []
+        for m in members:
+            try:
+                member = guild.get_member(int(m["discord_id"]))
+                if member:
+                    overwrites[member] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+                    added.append(member)
+            except Exception:
+                pass
+
+        await ch.edit(overwrites=overwrites)
+
+        mentions = " ".join(mm.mention for mm in added) or "—"
+        embed = discord.Embed(
+            title=f"🔄 Rotation updated — {artifact_name}",
+            description="The rotation player list has been changed.",
+            color=0xf59e0b,
+        )
+        embed.add_field(name="New rotation", value=mentions, inline=False)
+        await ch.send(embed=embed)
+
+        return aiohttp_web.json_response({"ok": True})
+    except Exception as e:
+        print(f"[rotation] update channel error: {e}", flush=True)
+        return aiohttp_web.json_response({"ok": False, "error": str(e)})
+
+
 async def handle_archive_rotation_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
     data = await request.json()
     guild_id = data.get("guild_id")
@@ -1981,6 +2029,7 @@ async def start_api_server():
     app.router.add_post("/api/create-artifact-channels", handle_create_artifact_channels)
     app.router.add_post("/api/delete-artifact-channels", handle_delete_artifact_channels)
     app.router.add_post("/api/create-rotation-channel", handle_create_rotation_channel)
+    app.router.add_post("/api/update-rotation-channel", handle_update_rotation_channel)
     app.router.add_post("/api/archive-rotation-channel", handle_archive_rotation_channel)
     app.router.add_post("/api/dm-invite", handle_dm_invite)
     app.router.add_post("/api/create-interest-channel", handle_create_interest_channel)

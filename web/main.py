@@ -18353,6 +18353,27 @@ async def artifact_rotation_save(request: Request, guild_id: str, artifact_id: i
                     "notify_hours": int(notify[i]) if i < len(notify) else 6,
                 })
     await database.save_rotation(artifact_id, guild_id, players)
+
+    # If rotation is already active with a channel, update channel permissions immediately
+    artifact = await database.get_artifact(artifact_id, guild_id)
+    ch_id = artifact.get("rotation_channel_id", "") if artifact else ""
+    if ch_id and artifact.get("rotation_active"):
+        members = []
+        for p in players:
+            m = await database.find_ally_member_by_name(guild_id, p["player_name"])
+            if m and m.get("discord_id"):
+                members.append({"player_name": p["player_name"], "discord_id": m["discord_id"]})
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                await client.post("http://bot:7777/api/update-rotation-channel", json={
+                    "guild_id": guild_id,
+                    "channel_id": ch_id,
+                    "artifact_name": artifact.get("name", "Artifact"),
+                    "members": members,
+                })
+        except Exception as e:
+            print(f"[rotation] update channel on save failed: {e}", flush=True)
+
     return JSONResponse({"ok": True})
 
 
