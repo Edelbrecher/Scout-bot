@@ -3,7 +3,7 @@
 
 {% block content %}
 {% from "_combat_flow.html" import combat_flow %}
-<div class="container">
+<div class="container-wide" style="padding:0 1rem;">
   <div class="page-header" style="margin-bottom:.5rem;">
     <a href="/guild/{{ guild.guild_id }}" class="back-link" style="font-size:.75rem;">&larr; {{ guild.guild_name }}</a>
     <h1 style="margin:.1rem 0 0;font-size:1rem;">&#x2694;&#xFE0F; Attacks</h1>
@@ -1872,16 +1872,16 @@
       html += `<div class="village-card" style="border-left:2px solid ${hasArt ? '#fbbf24' : threatColor};margin-bottom:.15rem;${hasArt?'border:1px solid rgba(251,191,36,.4);':''}">
         <div class="village-card-header" onclick="toggleVillageCollapse('${safeKey}')" style="cursor:pointer;user-select:none;padding:.18rem .45rem;display:flex;align-items:center;gap:.25rem;${hasArt?'background:rgba(251,191,36,.06);':''}">
           <span id="vc-arrow-${safeKey}" style="font-size:.5rem;color:var(--text-muted);flex-shrink:0;">${isCollapsed?'▶':'▼'}</span>
-          <span style="font-size:.66rem;font-weight:700;color:var(--text);">🏰 ${escHtml(g.name)}</span>
-          ${hasArt ? `<span style="font-size:.55rem;font-weight:800;padding:.08rem .35rem;border-radius:6px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);color:#fbbf24;">🏺 ${escHtml(artName)}</span>` : ''}
-          ${g.account ? `<span style="font-size:.56rem;color:#60a5fa;font-weight:600;">${escHtml(g.account)}${g.travian ? ` <span style="opacity:.7;">(${escHtml(g.travian)})</span>` : ''}</span>` : ''}
-          <span style="font-size:.54rem;color:var(--text-muted);">${escHtml(coords)}</span>
+          <span style="font-size:.78rem;font-weight:700;color:var(--text);">🏰 ${escHtml(g.name)}</span>
+          ${hasArt ? `<span style="font-size:.65rem;font-weight:800;padding:.08rem .35rem;border-radius:6px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);color:#fbbf24;">🏺 ${escHtml(artName)}</span>` : ''}
+          ${g.account ? `<span style="font-size:.68rem;color:#60a5fa;font-weight:600;">${escHtml(g.account)}${g.travian ? ` <span style="opacity:.7;">(${escHtml(g.travian)})</span>` : ''}</span>` : ''}
+          <span style="font-size:.65rem;color:var(--text-muted);">${escHtml(coords)}</span>
           <div style="margin-left:auto;display:flex;align-items:center;gap:.25rem;flex-shrink:0;">
             <button onclick="event.stopPropagation();openVillageMap('${escHtml(key).replace(/'/g,"\\'")}')"
-              style="font-size:.5rem;padding:.08rem .25rem;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:3px;color:#a5b4fc;cursor:pointer;" title="Attack Map">🗺️</button>
-            <span style="font-size:.54rem;color:var(--text-muted);">${g.attacks.length}</span>
-            ${realCount > 0 ? `<span style="color:#f87171;font-size:.54rem;font-weight:700;">⚠️${realCount}</span>` : ''}
-            ${supportCount > 0 ? `<span style="color:#4ade80;font-size:.54rem;">🛡️${supportCount}</span>` : ''}
+              style="font-size:.6rem;padding:.08rem .25rem;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:3px;color:#a5b4fc;cursor:pointer;" title="Attack Map">🗺️</button>
+            <span style="font-size:.65rem;color:var(--text-muted);">${g.attacks.length}</span>
+            ${realCount > 0 ? `<span style="color:#f87171;font-size:.65rem;font-weight:700;">⚠️${realCount}</span>` : ''}
+            ${supportCount > 0 ? `<span style="color:#4ade80;font-size:.65rem;">🛡️${supportCount}</span>` : ''}
           </div>
         </div>
         <div id="vc-body-${safeKey}" style="display:${isCollapsed?'none':'flex'};flex-direction:column;gap:0;">`;
@@ -1890,8 +1890,8 @@
         if (waves.length > 1) {
           html += `<div style="display:flex;align-items:center;gap:.3rem;padding:.15rem .55rem;
               background:rgba(255,255,255,.02);border-top:1px solid rgba(255,255,255,.04);">
-            <span style="font-size:.58rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Wave ${wi+1}</span>
-            <span style="font-size:.6rem;color:var(--text-muted);">— ${fmtArrival(waves[wi][0].arrival_time)}</span>
+            <span style="font-size:.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Wave ${wi+1}</span>
+            <span style="font-size:.72rem;color:var(--text-muted);">— ${fmtArrival(waves[wi][0].arrival_time)}</span>
           </div>`;
         }
         for (const a of waves[wi]) html += renderAttackRow(a);
@@ -2059,14 +2059,14 @@
         ${cbx}
         ${scoreDot}
         ${typeBadge(a.attack_type)}
-        <span style="font-weight:600;font-size:.66rem;color:#60a5fa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100px;">${escHtml(a.attacker_player)}</span>
-        ${a.has_artifact ? '<span style="font-size:.55rem;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.3);color:#fbbf24;border-radius:4px;padding:0 3px;font-weight:700;" title="'+escHtml(a.artifact_name||'')+'">🏺</span>' : ''}
+        <span style="font-weight:600;font-size:.8rem;color:#60a5fa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px;">${escHtml(a.attacker_player)}</span>
+        ${a.has_artifact ? '<span style="font-size:.62rem;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.3);color:#fbbf24;border-radius:4px;padding:0 3px;font-weight:700;" title="'+escHtml(a.artifact_name||'')+'">🏺</span>' : ''}
         ${defBadge}
         <span style="flex:1;min-width:0;"></span>
         ${troopShort}
         ${labelBadge(lbl)}
         ${noteDot}
-        <span style="color:#e2e8f0;font-size:.72rem;font-weight:700;font-family:monospace;flex-shrink:0;background:rgba(255,255,255,.06);padding:.05rem .3rem;border-radius:3px;">${fmtArrival(a.arrival_time)}</span>
+        <span style="color:#e2e8f0;font-size:.82rem;font-weight:700;font-family:monospace;flex-shrink:0;background:rgba(255,255,255,.06);padding:.05rem .35rem;border-radius:3px;">${fmtArrival(a.arrival_time)}</span>
       </div>`;
   }
 
