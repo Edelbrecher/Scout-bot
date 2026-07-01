@@ -167,9 +167,9 @@
         {% endfor %}
       {% endif %}
 
-      {# Reorder rotation so current holder is always first #}
+      {# Reorder rotation so current holder is first — only when rotation is active #}
       {% set rot_ns = namespace(list=[]) %}
-      {% if current_pos.val > 0 %}
+      {% if artifact.rotation_active and current_pos.val > 0 %}
         {% for r in rotation[current_pos.val:] %}{% set _ = rot_ns.list.append(r) %}{% endfor %}
         {% for r in rotation[:current_pos.val] %}{% set _ = rot_ns.list.append(r) %}{% endfor %}
       {% else %}
@@ -177,8 +177,8 @@
       {% endif %}
 
       {% for r in rot_ns.list %}
-      {% set is_current = loop.index0 == 0 and current_pos.val >= 0 %}
-      {% set is_next = loop.index0 == 1 and current_pos.val >= 0 and rot_ns.list|length > 1 %}
+      {% set is_current = loop.index0 == 0 and artifact.rotation_active and current_pos.val >= 0 %}
+      {% set is_next = loop.index0 == 1 and artifact.rotation_active and current_pos.val >= 0 and rot_ns.list|length > 1 %}
       {% set player_handoff = handoff_map.data.get(r.player_name) %}
       {% set has_confirmed = player_handoff and player_handoff.status == 'confirmed' %}
       <div class="rot-row {% if is_current %}current-holder{% elif is_next %}next-holder{% elif has_confirmed %}completed-holder{% endif %}"
