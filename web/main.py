@@ -15675,6 +15675,7 @@ async def hero_scout_manual_save(
     slot_weapon: str = Form(""),
     slot_mount: str = Form(""),
     slot_misc: str = Form(""),
+    edit_entry_id: int = Form(0),
 ):
     session, err = _require_session(request)
     if err: return err
@@ -15696,35 +15697,7 @@ async def hero_scout_manual_save(
     }
     slots_hash_str = _hl.md5("".join(slot_vals.values()).encode()).hexdigest()
 
-    # Änderung erkennen
-    changed = 0
     async with aiosqlite.connect(db_path) as db:
-        async with db.execute("""
-            SELECT e.id, e.slots_hash FROM hero_scout_entries e
-            WHERE guild_id=? AND lower(player_name)=lower(?)
-            ORDER BY created_at DESC LIMIT 1
-        """, (guild_id, player_name.strip())) as cur:
-            prev = await cur.fetchone()
-            if prev and prev[1] and prev[1] != slots_hash_str:
-                changed = 1
-
-    # Eintrag speichern
-    async with aiosqlite.connect(db_path) as db:
-        cur = await db.execute("""
-            INSERT INTO hero_scout_entries
-                (guild_id, player_name, tribe, alliance, villages, hero_level, hero_xp,
-                 attacker_rank, defender_rank, server_time, reporter_id, reporter_name,
-                 discord_url, slots_hash, changed, created_at, source)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        """, (
-            guild_id, player_name.strip(), tribe.strip(), alliance.strip(),
-            villages, hero_level, hero_xp, attacker_rank, defender_rank,
-            server_time.strip(), reporter_id, reporter_name,
-            "", slots_hash_str, changed, now, "manual",
-        ))
-        await db.commit()
-        entry_id = cur.lastrowid
-
         # item_name Spalte sicherstellen
         try:
             await db.execute("ALTER TABLE hero_scout_slots ADD COLUMN item_name TEXT DEFAULT ''")
@@ -15732,13 +15705,64 @@ async def hero_scout_manual_save(
         except Exception:
             pass
 
-        for idx, (sname, item_name) in enumerate(slot_vals.items()):
+        if edit_entry_id:
+            # Edit: update existing entry in-place, never mark as changed
             await db.execute("""
-                INSERT INTO hero_scout_slots (entry_id, guild_id, slot_index, slot_name,
-                    image_path, img_hash, item_name)
-                VALUES (?,?,?,?,?,?,?)
-            """, (entry_id, guild_id, idx, sname, "", "", item_name))
-        await db.commit()
+                UPDATE hero_scout_entries SET
+                    tribe=?, alliance=?, villages=?, hero_level=?, hero_xp=?,
+                    attacker_rank=?, defender_rank=?, server_time=?,
+                    slots_hash=?, changed=0, source='manual'
+                WHERE id=? AND guild_id=?
+            """, (
+                tribe.strip(), alliance.strip(), villages, hero_level, hero_xp,
+                attacker_rank, defender_rank, server_time.strip(),
+                slots_hash_str, edit_entry_id, guild_id,
+            ))
+            await db.commit()
+            await db.execute("DELETE FROM hero_scout_slots WHERE entry_id=?", (edit_entry_id,))
+            await db.commit()
+            for idx, (sname, item_name) in enumerate(slot_vals.items()):
+                await db.execute("""
+                    INSERT INTO hero_scout_slots (entry_id, guild_id, slot_index, slot_name,
+                        image_path, img_hash, item_name)
+                    VALUES (?,?,?,?,?,?,?)
+                """, (edit_entry_id, guild_id, idx, sname, "", "", item_name))
+            await db.commit()
+            changed = 0
+        else:
+            # New entry: detect equipment changes vs previous entry
+            changed = 0
+            async with db.execute("""
+                SELECT e.id, e.slots_hash FROM hero_scout_entries e
+                WHERE guild_id=? AND lower(player_name)=lower(?)
+                ORDER BY created_at DESC LIMIT 1
+            """, (guild_id, player_name.strip())) as cur:
+                prev = await cur.fetchone()
+                if prev and prev[1] and prev[1] != slots_hash_str:
+                    changed = 1
+
+            cur2 = await db.execute("""
+                INSERT INTO hero_scout_entries
+                    (guild_id, player_name, tribe, alliance, villages, hero_level, hero_xp,
+                     attacker_rank, defender_rank, server_time, reporter_id, reporter_name,
+                     discord_url, slots_hash, changed, created_at, source)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, (
+                guild_id, player_name.strip(), tribe.strip(), alliance.strip(),
+                villages, hero_level, hero_xp, attacker_rank, defender_rank,
+                server_time.strip(), reporter_id, reporter_name,
+                "", slots_hash_str, changed, now, "manual",
+            ))
+            await db.commit()
+            entry_id = cur2.lastrowid
+
+            for idx, (sname, item_name) in enumerate(slot_vals.items()):
+                await db.execute("""
+                    INSERT INTO hero_scout_slots (entry_id, guild_id, slot_index, slot_name,
+                        image_path, img_hash, item_name)
+                    VALUES (?,?,?,?,?,?,?)
+                """, (entry_id, guild_id, idx, sname, "", "", item_name))
+            await db.commit()
 
     from urllib.parse import quote
     flash_param = "changed" if changed else "saved"

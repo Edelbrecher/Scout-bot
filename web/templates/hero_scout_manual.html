@@ -23,6 +23,7 @@
   {% endif %}
 
   <form method="post" action="/guild/{{ guild.guild_id }}/defense/hero-scout/manual/save">
+    {% if edit_entry_id %}<input type="hidden" name="edit_entry_id" value="{{ edit_entry_id }}">{% endif %}
 
     <!-- Held-Basisdaten -->
     <div class="card" style="margin-bottom:1.25rem;">
