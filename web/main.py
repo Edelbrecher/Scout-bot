@@ -15350,10 +15350,10 @@ _HERO_ITEMS_BY_CAT = {
         ("armor_breast_1",       "Light Breastplate [T1] +500 fighting str."),
         ("armor_breast_2",       "Breastplate [T2] +2,000 fighting str."),
         ("armor_breast_3",       "Heavy Breastplate [T3] +4,000 fighting str."),
-        # Lamellar armor
-        ("armor_seg_1",          "Light Lamellar Armor [T1] +500 fighting str."),
-        ("armor_seg_2",          "Lamellar Armor [T2] +2,000 fighting str."),
-        ("armor_seg_3",          "Heavy Lamellar Armor [T3] +4,000 fighting str."),
+        # Segment armor
+        ("armor_seg_1",          "Light Segment Armor [T1] +500 fighting str."),
+        ("armor_seg_2",          "Segment Armor [T2] +2,000 fighting str."),
+        ("armor_seg_3",          "Heavy Segment Armor [T3] +4,000 fighting str."),
         # Regen armor
         ("armor_regen_1",        "Armor of Renewal [T1] +20 HP/day"),
         ("armor_regen_2",        "Armor of Health [T2] +30 HP/day"),
@@ -15458,6 +15458,22 @@ _HERO_ITEMS_BY_CAT = {
         ("wpn_resheph_1",        "Lance of the Resheph Chariot [T1] ☀️"),
         ("wpn_resheph_2",        "Heavy Lance of the Resheph Chariot [T2] ☀️"),
         ("wpn_resheph_3",        "Large Lance of the Resheph Chariot [T3] ☀️"),
+        # Spartans
+        ("wpn_spartan_1",        "Short Spear of the Hoplite [T1] 🔱"),
+        ("wpn_spartan_2",        "Spear of the Hoplite [T2] 🔱"),
+        ("wpn_spartan_3",        "Long Spear of the Hoplite [T3] 🔱"),
+        ("wpn_sentinel_1",       "Short Sword of the Sentinel [T1] 🔱"),
+        ("wpn_sentinel_2",       "Sword of the Sentinel [T2] 🔱"),
+        ("wpn_sentinel_3",       "Long Sword of the Sentinel [T3] 🔱"),
+        ("wpn_shieldsman_1",     "Club of the Shieldsman [T1] 🔱"),
+        ("wpn_shieldsman_2",     "Morning Star of the Shieldsman [T2] 🔱"),
+        ("wpn_shieldsman_3",     "Mace of the Shieldsman [T3] 🔱"),
+        ("wpn_horseman_sp_1",    "Short Sword of the Spartan Horseman [T1] 🔱"),
+        ("wpn_horseman_sp_2",    "Sword of the Spartan Horseman [T2] 🔱"),
+        ("wpn_horseman_sp_3",    "Long Sword of the Spartan Horseman [T3] 🔱"),
+        ("wpn_corinthian_1",     "Spatha of the Corinthian Rider [T1] 🔱"),
+        ("wpn_corinthian_2",     "Sword of the Corinthian Rider [T2] 🔱"),
+        ("wpn_corinthian_3",     "Long Sword of the Corinthian Rider [T3] 🔱"),
     ],
     "mount": [
         ("mount_gelding",        "Gelding [T1] 14 sq/h"),

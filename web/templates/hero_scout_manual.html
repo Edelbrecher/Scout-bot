@@ -60,7 +60,7 @@
           <select name="tribe" id="tribeSelect" onchange="filterWeapons()"
                   style="width:100%;padding:0.5rem 0.75rem;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;">
             <option value="" data-i18n="manual.tribe.unknown">– unknown –</option>
-            {% for t in ['Romans','Teutons','Gauls','Egyptians','Huns','Spartans'] %}
+            {% for t in ['Romans','Teutons','Gauls','Huns','Egyptians','Spartans'] %}
             <option value="{{ t }}" {% if prefill.tribe == t %}selected{% endif %}>{{ t }}</option>
             {% endfor %}
           </select>
@@ -158,15 +158,16 @@
                 ('🍀 Gauls',  '🍀'),
                 ('🏹 Huns',   '🏹'),
                 ('☀️ Egyptians',  '☀️'),
+                ('🔱 Spartans',   '🔱'),
               ] %}
               {% for group_label, marker in tribe_groups %}
               <optgroup label="{{ group_label }}" class="weapon-group" data-tribe="{{ group_label }}">
                 {% for item_id, item_name in items_by_cat.get('weapon', []) %}
                   {% if marker in item_name %}
-                  <option value="{{ item_name | replace(' 🏛️','') | replace(' ⚒️','') | replace(' 🍀','') | replace(' 🏹','') | replace(' ☀️','') }}"
-                    {% set clean = item_name | replace(' 🏛️','') | replace(' ⚒️','') | replace(' 🍀','') | replace(' 🏹','') | replace(' ☀️','') %}
+                  <option value="{{ item_name | replace(' 🏛️','') | replace(' ⚒️','') | replace(' 🍀','') | replace(' 🏹','') | replace(' ☀️','') | replace(' 🔱','') }}"
+                    {% set clean = item_name | replace(' 🏛️','') | replace(' ⚒️','') | replace(' 🍀','') | replace(' 🏹','') | replace(' ☀️','') | replace(' 🔱','') %}
                     {% if prefill.slots is defined and prefill.slots.get(slot_key) == clean %}selected{% endif %}>
-                    {{ item_name | replace(' 🏛️','') | replace(' ⚒️','') | replace(' 🍀','') | replace(' 🏹','') | replace(' ☀️','') }}
+                    {{ item_name | replace(' 🏛️','') | replace(' ⚒️','') | replace(' 🍀','') | replace(' 🏹','') | replace(' ☀️','') | replace(' 🔱','') }}
                   </option>
                   {% endif %}
                 {% endfor %}
@@ -213,10 +214,11 @@
 // Tribe filter for weapons: highlights the matching optgroup
 const TRIBE_MAP = {
   'Romans':    '🏛️ Romans',
-  'Teutons': '⚒️ Teutons',
-  'Gauls':  '🍀 Gauls',
-  'Huns':   '🏹 Huns',
-  'Egyptians':  '☀️ Egyptians',
+  'Teutons':   '⚒️ Teutons',
+  'Gauls':     '🍀 Gauls',
+  'Huns':      '🏹 Huns',
+  'Egyptians': '☀️ Egyptians',
+  'Spartans':  '🔱 Spartans',
 };
 
 function filterWeapons() {
