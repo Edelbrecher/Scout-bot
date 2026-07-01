@@ -15354,6 +15354,10 @@ _HERO_ITEMS_BY_CAT = {
         ("armor_seg_1",          "Light Segment Armor [T1] +500 fighting str."),
         ("armor_seg_2",          "Segment Armor [T2] +2,000 fighting str."),
         ("armor_seg_3",          "Heavy Segment Armor [T3] +4,000 fighting str."),
+        # Lamellar armor
+        ("armor_lam_1",          "Light Lamellar Armor [T1] +500 fighting str."),
+        ("armor_lam_2",          "Lamellar Armor [T2] +2,000 fighting str."),
+        ("armor_lam_3",          "Heavy Lamellar Armor [T3] +4,000 fighting str."),
         # Regen armor
         ("armor_regen_1",        "Armor of Renewal [T1] +20 HP/day"),
         ("armor_regen_2",        "Armor of Health [T2] +30 HP/day"),
