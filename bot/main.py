@@ -1890,6 +1890,24 @@ async def handle_archive_rotation_channel(request: aiohttp_web.Request) -> aioht
         return aiohttp_web.json_response({"ok": False, "error": str(e)})
 
 
+async def handle_channel_message(request: aiohttp_web.Request) -> aiohttp_web.Response:
+    data = await request.json()
+    guild_id = data.get("guild_id")
+    channel_id = data.get("channel_id")
+    content = data.get("content", "")
+    guild = bot.get_guild(int(guild_id)) if guild_id else None
+    if not guild:
+        return aiohttp_web.json_response({"ok": False, "error": "Guild not found"})
+    try:
+        ch = guild.get_channel(int(channel_id))
+        if ch:
+            await ch.send(content)
+        return aiohttp_web.json_response({"ok": True})
+    except Exception as e:
+        print(f"[bot] channel-message error: {e}", flush=True)
+        return aiohttp_web.json_response({"ok": False, "error": str(e)})
+
+
 async def handle_create_interest_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
     data = await request.json()
     guild_id = data.get("guild_id", "")
@@ -2031,6 +2049,7 @@ async def start_api_server():
     app.router.add_post("/api/create-rotation-channel", handle_create_rotation_channel)
     app.router.add_post("/api/update-rotation-channel", handle_update_rotation_channel)
     app.router.add_post("/api/archive-rotation-channel", handle_archive_rotation_channel)
+    app.router.add_post("/api/channel-message", handle_channel_message)
     app.router.add_post("/api/dm-invite", handle_dm_invite)
     app.router.add_post("/api/create-interest-channel", handle_create_interest_channel)
     runner = aiohttp_web.AppRunner(app)

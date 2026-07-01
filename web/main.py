@@ -18354,10 +18354,22 @@ async def artifact_rotation_save(request: Request, guild_id: str, artifact_id: i
                 })
     await database.save_rotation(artifact_id, guild_id, players)
 
-    # If rotation is already active with a channel, update channel permissions immediately
+    # If rotation is already active, reset start time so new order takes effect immediately
     artifact = await database.get_artifact(artifact_id, guild_id)
     ch_id = artifact.get("rotation_channel_id", "") if artifact else ""
-    if ch_id and artifact.get("rotation_active"):
+    if artifact and artifact.get("rotation_active") and players:
+        import datetime as _dt
+        new_holder = players[0]["player_name"]
+        next_player = players[1]["player_name"] if len(players) > 1 else new_holder
+        hold_h = int(players[0].get("hold_hours", 30) or 30)
+        started = _dt.datetime.utcnow().isoformat()
+        await database.set_artifact_rotation_state(
+            artifact_id, guild_id,
+            rotation_started_at=started,
+            current_holder=new_holder,
+            rot_last_start_window=-1,
+            rot_last_notify_window=-1,
+        )
         members = []
         for p in players:
             m = await database.find_ally_member_by_name(guild_id, p["player_name"])
@@ -18365,12 +18377,23 @@ async def artifact_rotation_save(request: Request, guild_id: str, artifact_id: i
                 members.append({"player_name": p["player_name"], "discord_id": m["discord_id"]})
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
-                await client.post("http://bot:7777/api/update-rotation-channel", json={
-                    "guild_id": guild_id,
-                    "channel_id": ch_id,
-                    "artifact_name": artifact.get("name", "Artifact"),
-                    "members": members,
-                })
+                if ch_id:
+                    await client.post("http://bot:7777/api/update-rotation-channel", json={
+                        "guild_id": guild_id,
+                        "channel_id": ch_id,
+                        "artifact_name": artifact.get("name", "Artifact"),
+                        "members": members,
+                    })
+                    end_ts = (_dt.datetime.utcnow() + _dt.timedelta(hours=hold_h)).strftime("%Y-%m-%d %H:%M")
+                    await client.post("http://bot:7777/api/channel-message", json={
+                        "guild_id": guild_id,
+                        "channel_id": ch_id,
+                        "content": (
+                            f"🔄 **Rotation updated manually.**\n"
+                            f"🟢 **{new_holder}** is now holding **{artifact.get('name','Artifact')}** "
+                            f"for {hold_h}h — until **{end_ts} UTC**, then → **{next_player}**."
+                        ),
+                    })
         except Exception as e:
             print(f"[rotation] update channel on save failed: {e}", flush=True)
 
