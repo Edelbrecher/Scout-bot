@@ -105,9 +105,6 @@
       <div style="font-size:.9rem;font-weight:600;" id="activationDisplay">
         {{ artifact.activated_at or '—' }}
       </div>
-      {% if artifact.activated_at %}
-      <div id="activationCountdown" style="font-size:.72rem;margin-top:.2rem;" data-activation="{{ artifact.activated_at }}"></div>
-      {% endif %}
     </div>
   </div>
 
@@ -140,15 +137,11 @@
         <span style="font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#4ade80;">● LIVE</span>
         <span style="font-size:.95rem;font-weight:800;">🟢 {{ rot_state.current_player }}</span>
         <span style="font-size:.78rem;color:var(--text-muted);">holds now</span>
-        <span style="margin-left:auto;font-size:.78rem;color:var(--text-muted);">cycle: {{ rot_state.cycle_hours }}h</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:.6rem;margin-top:.5rem;flex-wrap:wrap;">
-        <span style="font-size:.8rem;">⏳ Handoff to <strong style="color:#f59e0b;">{{ rot_state.next_player }}</strong> in</span>
-        <span id="rotCountdown" style="font-size:.9rem;font-weight:800;font-family:monospace;color:#fbbf24;" data-end="{{ rot_state.window_end }}">…</span>
-        <span style="font-size:.72rem;color:var(--text-muted);">(at {{ rot_state.window_end[:16].replace('T',' ') }} UTC)</span>
+        <span style="font-size:.78rem;color:var(--text-muted);">· {{ rot_state.current_hold_hours }}h hold</span>
+        <span style="margin-left:auto;font-size:.78rem;color:var(--text-muted);">next: <strong style="color:#f59e0b;">{{ rot_state.next_player }}</strong></span>
       </div>
       <div style="font-size:.72rem;color:var(--text-muted);margin-top:.4rem;">
-        🤖 The bot DMs each player when their turn starts and {{ rot_state.notify_hours }}h before they must pass it on. Holder advances automatically — no manual handoffs needed.
+        🤖 The bot DMs each player when their turn starts and {{ rot_state.notify_hours }}h before they must pass it on.
       </div>
     </div>
     {% endif %}
@@ -457,22 +450,6 @@
   </div>
   {% endif %}
 
-  {% if artifact.rotation_active and rot_state %}
-  <!-- Big rotation countdown clock -->
-  <div style="margin-top:1.5rem;text-align:center;padding:1.5rem 1rem;background:linear-gradient(135deg,rgba(15,15,20,.95),rgba(20,20,30,.95));border:1px solid rgba(99,102,241,.25);border-radius:14px;">
-    <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#4ade80;margin-bottom:.3rem;">● ROTATION ACTIVE</div>
-    <div style="font-size:.85rem;color:var(--text-muted);margin-bottom:.6rem;">
-      🟢 <strong style="color:#e2e8f0;">{{ rot_state.current_player }}</strong> → next: <strong style="color:#f59e0b;">{{ rot_state.next_player }}</strong>
-    </div>
-    <div id="bigClock" data-end="{{ rot_state.window_end }}"
-         style="font-family:'Courier New',monospace;font-size:3rem;font-weight:900;letter-spacing:.15em;
-                color:#fbbf24;text-shadow:0 0 20px rgba(251,191,36,.4),0 0 60px rgba(251,191,36,.15);
-                line-height:1;padding:.3rem 0;">
-      --:--:--
-    </div>
-    <div style="font-size:.68rem;color:var(--text-muted);margin-top:.4rem;">until handoff · {{ rot_state.window_end[:16].replace('T',' ') }} UTC</div>
-  </div>
-  {% endif %}
 
 </div>
 
@@ -946,64 +923,7 @@ async function stopRotation() {
   if (res.ok) location.reload();
 }
 
-// ── Live countdown to next handoff ────────────────────────────────────────
-(function() {
-  const el = document.getElementById('rotCountdown');
-  if (!el) return;
-  const end = new Date(el.dataset.end).getTime();
-  function tick() {
-    const diff = end - Date.now();
-    if (diff <= 0) { el.textContent = 'now — advancing…'; el.style.color = '#f87171'; return; }
-    const h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000);
-    el.textContent = `${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`;
-    setTimeout(tick, 1000);
-  }
-  tick();
-})();
-
-// ── Big digital clock ────────────────────────────────────────────────────
-(function() {
-  const el = document.getElementById('bigClock');
-  if (!el) return;
-  const end = new Date(el.dataset.end).getTime();
-  function clockTick() {
-    const diff = end - Date.now();
-    if (diff <= 0) {
-      el.textContent = '00:00:00';
-      el.style.color = '#f87171';
-      el.style.textShadow = '0 0 20px rgba(248,113,113,.5),0 0 60px rgba(248,113,113,.2)';
-      return;
-    }
-    const h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000);
-    el.textContent = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-    if (diff < 3600000) { el.style.color = '#f87171'; el.style.textShadow = '0 0 20px rgba(248,113,113,.5)'; }
-    else if (diff < 10800000) { el.style.color = '#fb923c'; el.style.textShadow = '0 0 20px rgba(251,146,60,.4)'; }
-    requestAnimationFrame(() => setTimeout(clockTick, 200));
-  }
-  clockTick();
-})();
 {% endif %}
-
-// ── Activation countdown ─────────────────────────────────────────────────────
-(function() {
-  const el = document.getElementById('activationCountdown');
-  if (!el) return;
-  const raw = el.dataset.activation;
-  if (!raw) return;
-  const actTime = new Date(raw.replace(' ', 'T')).getTime();
-  if (isNaN(actTime)) return;
-  function tick() {
-    const diff = actTime - Date.now();
-    if (diff <= 0) {
-      el.innerHTML = '<span style="color:#4ade80;font-weight:700;">✅ Active now</span>';
-      return;
-    }
-    const h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000);
-    el.innerHTML = `<span style="color:#f59e0b;">⏳ Activates in ${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s</span>`;
-    setTimeout(tick, 1000);
-  }
-  tick();
-})();
 
 // ── Confirm handoff ───────────────────────────────────────────────────────────
 function openConfirmModal(hid, fromPlayer, toPlayer) {
