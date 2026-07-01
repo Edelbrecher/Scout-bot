@@ -18342,25 +18342,13 @@ async def artifact_rotation_save(request: Request, guild_id: str, artifact_id: i
     if err: return err
     if not (_is_leader(session, guild_id) or await has_perm(request, guild_id, "ally_manage")):
         return JSONResponse({"error": "forbidden"}, status_code=403)
-    form = await request.form()
     import json as _json
-    # Expect JSON body with players array
     body = await request.body()
     try:
         data = _json.loads(body)
         players = data.get("players", [])
     except Exception:
         players = []
-        names = form.getlist("player_name")
-        hours = form.getlist("hold_hours")
-        notify = form.getlist("notify_hours")
-        for i, n in enumerate(names):
-            if n.strip():
-                players.append({
-                    "player_name": n.strip(),
-                    "hold_hours": int(hours[i]) if i < len(hours) else 48,
-                    "notify_hours": int(notify[i]) if i < len(notify) else 6,
-                })
     await database.save_rotation(artifact_id, guild_id, players)
 
     # If rotation is already active, reset start time so new order takes effect immediately
