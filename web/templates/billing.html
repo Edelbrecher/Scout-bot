@@ -1,378 +1,75 @@
 {% extends "base.html" %}
-{% block title %}Subscription · {{ guild.guild_name }} · TravOps{% endblock %}
+{% block title %}Support TravOps · {{ guild.guild_name }}{% endblock %}
 
 {% block content %}
-<style>
-.billing-header {
-  text-align: center;
-  padding: 2rem 1rem 1.5rem;
-  margin-bottom: 0.5rem;
-}
-.tier-card {
-  position: relative;
-  border-radius: 16px;
-  padding: 1.5rem 1.25rem;
-  cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
-  user-select: none;
-  display: flex;
-  flex-direction: column;
-}
-.tier-card:hover { transform: translateY(-3px); }
-.tier-card.selected { box-shadow: 0 0 0 3px rgba(59,130,246,0.35); }
-.tier-card.popular.selected { box-shadow: 0 0 0 3px rgba(245,158,11,0.35); }
-.tier-check {
-  display: none;
-  position: absolute;
-  top: 12px; right: 12px;
-  width: 24px; height: 24px;
-  background: #3b82f6;
-  border-radius: 50%;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  color: #fff;
-  font-weight: 700;
-}
-.tier-card.selected .tier-check { display: flex; }
-.tier-feat-list {
-  list-style: none;
-  padding: 0; margin: 0;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  flex: 1;
-}
-.tier-feat-list li[data-tip] { position: relative; cursor: help; }
-.tier-feat-list li[data-tip] .ftip-icon { color: #64748b; font-size: 0.68rem; margin-left: 0.2rem; flex-shrink: 0; }
-.tier-feat-list li[data-tip]::after {
-  content: attr(data-tip);
-  position: absolute; left: 0; right: 0; bottom: calc(100% + 8px);
-  background: #0f172a; color: #e2e8f0;
-  font-size: 0.72rem; font-weight: 400; line-height: 1.4;
-  padding: 0.55rem 0.7rem; border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.1);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
-  opacity: 0; visibility: hidden; pointer-events: none;
-  transition: opacity 0.15s ease;
-  z-index: 50; text-align: left; white-space: normal;
-}
-.tier-feat-list li[data-tip]:hover::after { opacity: 1; visibility: visible; }
-.billing-toggle {
-  display: inline-flex;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 30px;
-  padding: 4px;
-  gap: 4px;
-}
-.toggle-btn {
-  padding: 0.45rem 1.4rem;
-  border-radius: 24px;
-  border: none;
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 600;
-  transition: all 0.15s;
-}
-.checkout-main {
-  padding: 1rem 2.5rem;
-  font-size: 1.05rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-  color: #000;
-  border: none;
-  border-radius: 12px;
-  cursor: pointer;
-  box-shadow: 0 4px 20px rgba(245,158,11,0.3);
-  transition: opacity 0.15s, transform 0.15s;
-}
-.checkout-main:hover { opacity: .88; transform: translateY(-1px); }
-</style>
-
-<div class="container" style="max-width:1020px;">
+<div class="container" style="max-width:680px;">
 
   <div style="margin-bottom:1rem;">
     <a href="/guild/{{ guild.guild_id }}" class="back-link">← {{ guild.guild_name }}</a>
   </div>
 
-  <!-- ── Flash ── -->
-  {% if saved == 'trial_started' %}
-  <div style="margin-bottom:1rem;padding:1rem 1.25rem;background:rgba(34,197,94,0.1);border:1px solid #22c55e;border-radius:10px;color:#4ade80;display:flex;gap:0.75rem;align-items:center;">
-    🎉 <div><strong>30-day trial started!</strong> All features for this server are now unlocked. Good luck!</div>
-  </div>
-  {% elif saved %}
-  <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:rgba(34,197,94,0.1);border:1px solid #22c55e;border-radius:8px;color:#4ade80;">
-    ✅ Subscription activated – thanks! Your features are now unlocked.
-  </div>
-  {% endif %}
   {% if error == 'premium_required' %}
   <div style="margin-bottom:1rem;padding:1rem 1.25rem;background:#2a1a3a;border:2px solid #a855f7;border-radius:10px;color:#d8b4fe;font-size:1.05rem;">
-    🔒 This feature requires a Pro subscription. Choose a plan to continue.
+    🔒 This feature requires a Pro subscription. TravOps is currently in free beta — all features are unlocked.
   </div>
   {% elif error == 'alliance_required' %}
   <div style="margin-bottom:1rem;padding:1rem 1.25rem;background:#2a1a3a;border:2px solid #a855f7;border-radius:10px;color:#d8b4fe;font-size:1.05rem;">
-    🛡️ This feature requires an Alliance plan. Choose Starter or higher.
+    🛡️ This feature requires an Alliance plan. TravOps is currently in free beta — all features are unlocked.
   </div>
-  {% elif error == 'trial_already_used' %}
-  <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:rgba(245,158,11,0.1);border:1px solid #f59e0b;border-radius:8px;color:#fcd34d;">⚠️ The free trial has already been used for this server.</div>
-  {% elif error == 'cancelled' %}
-  <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;">❌ Payment cancelled.</div>
   {% elif error %}
-  <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;">❌ {{ error }}</div>
+  <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#3a1a1a;border:1px solid #e05555;border-radius:8px;color:#e05555;">⚠️ {{ error }}</div>
   {% endif %}
 
-  <!-- ── Aktueller Status ── -->
-  {% set sub_status = guild.get('subscription_status', 'free') if guild else 'free' %}
-  {% set sub_plan   = guild.subscription_plan or '' %}
-  {% set sub_tier   = sub_plan.split('_')[0] if '_' in sub_plan else '' %}
-  {% set sub_int    = sub_plan.split('_')[1] if '_' in sub_plan else '' %}
-
-  <div class="card" style="margin-bottom:1.75rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
-    <div>
-      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.3rem;" data-i18n="billing.current_plan">Current Plan</div>
-      {% if sub_status == 'trialing' %}
-        <span style="font-size:1.1rem;font-weight:700;color:#93c5fd;">🎁 Trial</span>
-        {% if sub_tier %}<span style="color:var(--text-muted);margin-left:0.5rem;">· {{ {'starter':'Starter','clan':'Plus','alliance':'Premium','imperium':'Imperium'}.get(sub_tier, sub_tier|capitalize) }}</span>{% endif %}
-      {% elif sub_status == 'active' %}
-        <span style="font-size:1.1rem;font-weight:700;color:#4ade80;">✅ Active</span>
-        {% if sub_tier %}<span style="color:var(--text-muted);margin-left:0.5rem;">· {{ {'starter':'Starter','clan':'Plus','alliance':'Premium','imperium':'Imperium'}.get(sub_tier, sub_tier) }}</span>{% endif %}
-        {% if sub_int %}<span style="color:var(--text-muted);font-size:0.85rem;margin-left:0.3rem;">({{ 'Annual' if sub_int == 'annual' else 'Monthly' }})</span>{% endif %}
-      {% elif sub_status == 'past_due' %}
-        <span style="font-size:1.1rem;font-weight:700;color:#fb923c;">⚠️ Payment overdue</span>
-      {% elif sub_status == 'cancelled' %}
-        <span style="font-size:1.1rem;font-weight:700;color:#6b7280;">🔒 Cancelled</span>
-      {% else %}
-        <span style="font-size:1.1rem;font-weight:700;color:var(--text-muted);">🆓 No active subscription</span>
-      {% endif %}
-      {% if guild.subscription_expires_at %}
-      <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.2rem;">Runs until: {{ guild.subscription_expires_at[:10] }}</div>
-      {% endif %}
-    </div>
-    {% if guild.stripe_customer_id and sub_status in ('active','trialing','past_due') %}
-    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-      <form method="post" action="/guild/{{ guild.guild_id }}/billing/portal">
-        <button type="submit" class="btn btn-secondary" data-i18n="billing.manage.btn">🔧 Manage</button>
-      </form>
-      {% if is_owner %}
-      <form method="post" action="/guild/{{ guild.guild_id }}/billing/cancel"
-            onsubmit="return confirm('Really cancel subscription? It will continue until the end of the paid period.')">
-        <button type="submit" class="btn btn-danger" data-i18n="billing.cancel.btn">❌ Cancel</button>
-      </form>
-      {% endif %}
-    </div>
-    {% endif %}
-  </div>
-
-  {% if cancelled %}
-  <div style="margin-bottom:1rem;padding:0.75rem 1rem;background:#1a2a3a;border:1px solid #60a5fa;border-radius:8px;color:#93c5fd;">
-    ✅ Your subscription has been cancelled and will continue until the end of the paid period.
-  </div>
-  {% endif %}
-
-  {% if not stripe_configured %}
-  <div class="card">
-    <p class="hint">⚙️ Stripe not configured. Please set <code>STRIPE_SECRET_KEY</code> in the <code>.env</code> file.</p>
-  </div>
-  {% else %}
-
-  <!-- ── Free Trial Banner ── -->
-  {% if not free_trial_used and sub_status not in ('active', 'trialing') %}
-  <div style="background:linear-gradient(135deg,rgba(5,150,105,0.12),rgba(16,185,129,0.06));border:1px solid rgba(16,185,129,0.35);border-radius:14px;padding:1.5rem 1.75rem;margin-bottom:1.75rem;display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;">
-    <div style="font-size:2.5rem;">🎁</div>
-    <div style="flex:1;">
-      <div style="font-size:1.1rem;font-weight:700;color:#34d399;margin-bottom:0.25rem;">30 days free trial</div>
-      <div style="font-size:0.85rem;color:var(--text-muted);">One-time · No credit card · Choose your plan and start instantly</div>
-    </div>
-    <form method="post" action="/guild/{{ guild.guild_id }}/billing/start-free-trial" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-      <select name="plan" style="padding:0.45rem 0.75rem;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:0.88rem;">
-        <option value="starter">⚡ Starter</option>
-        <option value="clan" selected>⚔️ Clan</option>
-        <option value="alliance">🛡️ Alliance</option>
-        <option value="imperium">👑 Imperium</option>
-      </select>
-      <button type="submit" style="padding:0.55rem 1.4rem;background:linear-gradient(135deg,#059669,#0d9488);border:none;border-radius:9px;color:#fff;font-size:0.9rem;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 3px 12px rgba(5,150,105,0.3);">
-        Start for free now →
-      </button>
-    </form>
-  </div>
-  {% elif sub_status == 'trialing' and free_trial_used and trial_days_left is not none %}
-  <div style="background:linear-gradient(135deg,rgba(139,92,246,0.1),rgba(59,130,246,0.06));border:1px solid rgba(139,92,246,0.3);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
-    <div style="font-size:1rem;">🎁</div>
-    <div style="flex:1;font-size:0.88rem;">
-      <strong style="color:#c4b5fd;">30-day trial active</strong>
-      <span style="color:var(--text-muted);margin-left:0.5rem;"><strong style="color:#a78bfa;">{{ trial_days_left }} day{{ 's' if trial_days_left != 1 else '' }}</strong> left</span>
-    </div>
-  </div>
-  {% elif free_trial_used and sub_status not in ('active', 'trialing') %}
-  <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1.25rem;color:#fcd34d;font-size:0.88rem;">
-    ⏱️ Your free trial has expired. Subscribe to a plan to continue.
-  </div>
-  {% endif %}
-
-  <!-- ── Header ── -->
-  <div class="billing-header">
-    <h1 style="margin:0 0 0.4rem;font-size:1.8rem;font-weight:900;">Choose your plan</h1>
-    <p style="color:var(--text-muted);margin:0 0 1.5rem;font-size:0.95rem;">Cancel anytime</p>
-  </div>
-
-  <!-- ── Tier Cards ── -->
-  {% set tiers = [
-    ('starter',  'Starter',  '⚡', '#22c55e', 1, 6.99,  55.99, 'For individual guilds', [
-      ('🔭', 'Scout system', 'Scout reports &amp; evaluation'),
-      ('🌾', 'Res-Push', 'Resource requests'),
-      ('🗺️', 'Operation planning', 'March timers & attacks'),
-      ('⚜️', 'Farming Intel', 'Detect inactive farms'),
-      ('🗂️', 'Map & Timer', 'World map & action timers'),
-      ('🚨', 'Attack-Detection', 'Incoming detection'),
-    ]),
-    ('clan',     'Plus',     '⚔️', '#f59e0b', 2, 10.99, 87.99, 'For active guilds', [
-      ('✅', 'Everything in Starter', ''),
-      ('🏰', '2 Discord servers', 'Multiple worlds at once'),
-      ('⚡', 'Priority support', 'Faster response times'),
-    ]),
-    ('alliance', 'Premium', '🛡️', '#a855f7', 3, 14.99, 119.99, 'For alliances', [
-      ('✅', 'Everything in Plus', ''),
-      ('🌐', '3 Discord servers', ''),
-      ('🤝', 'Alliance overview', 'Members &amp; activity'),
-    ]),
-    ('imperium', 'Imperium', '👑', '#ef4444', 5, 19.99, 159.99, 'For large communities', [
-      ('✅', 'Everything in Premium', ''),
-      ('🏛️', '5 Discord servers', ''),
-      ('🎯', 'Dedicated Support', 'Direct contact'),
-    ]),
-  ] %}
-
-  {% set feature_tips = {
-    'Scout system': 'Automated scouting reports reveal enemy troops, resources and defenses before you attack — know exactly what you are facing.',
-    'Res-Push': 'Streamlines resource requests between alliance members so rebuilds and reinforcements never stall for lack of materials.',
-    'Operation planning': 'Plan multi-wave attacks with synced arrival times so every hammer and catapult lands exactly on schedule.',
-    'Farming Intel': 'Automatically surfaces inactive and weakly-defended villages, turning farming into a data-driven routine instead of guesswork.',
-    'Map & Timer': 'Live world map with troop movement timers, so you always know what is heading where and when it will land.',
-    'Attack-Detection': 'Instant alerts the moment incoming attacks are spotted, giving your alliance time to defend or evacuate.',
-    'Everything in Starter': 'Includes every feature from the Starter plan, plus everything listed below.',
-    'Everything in Plus': 'Includes every feature from the Plus plan, plus everything listed below.',
-    'Everything in Premium': 'Includes every feature from the Premium plan, plus everything listed below.',
-    '2 Discord servers': 'Run TravOps on two Discord servers at once — ideal for a second world or a sister alliance.',
-    '3 Discord servers': 'Run TravOps across three Discord servers — built for alliances active in multiple worlds.',
-    '5 Discord servers': 'Run TravOps across five Discord servers — built for large communities managing many worlds at once.',
-    'Alliance overview': 'See member activity, troop strength and engagement at a glance across your whole alliance.',
-    'Priority support': 'Jump the queue and get faster responses whenever you need help.',
-    'Dedicated Support': 'A direct line to the TravOps team for setup help, custom requests and priority fixes.',
-  } %}
-
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:1.75rem;">
-    {% for tid, tname, temoji, tcolor, servers, price_m, price_a, tagline, features in tiers %}
-    {% set is_popular = tid == 'clan' %}
-
-    <div class="tier-card {% if is_popular %}popular{% endif %}"
-         data-tier="{{ tid }}"
-         onclick="selectTier('{{ tid }}')"
-         style="border:2px solid {% if is_popular %}{{ tcolor }}{% else %}var(--border){% endif %};
-                background:{% if is_popular %}linear-gradient(160deg,var(--bg-card),#1c1500){% else %}var(--bg-card){% endif %};">
-
-      {% if is_popular %}
-      <div style="position:absolute;top:-13px;left:50%;transform:translateX(-50%);
-                  background:{{ tcolor }};color:#000;font-size:0.68rem;font-weight:900;
-                  padding:2px 14px;border-radius:10px;white-space:nowrap;letter-spacing:.04em;">
-        ⭐ MOST POPULAR
-      </div>
-      {% endif %}
-
-      <div class="tier-check" style="background:{{ tcolor }};color:{% if is_popular %}#000{% else %}#fff{% endif %};">✓</div>
-
-      <!-- Icon + Name -->
-      <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.75rem;">
-        <div style="width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;
-                    font-size:1.3rem;background:{{ tcolor }}18;border:1px solid {{ tcolor }}33;">{{ temoji }}</div>
-        <div>
-          <div style="font-size:1.05rem;font-weight:800;">{{ tname }}</div>
-          <div style="font-size:0.72rem;color:var(--text-muted);">{{ servers }} Server · {{ tagline }}</div>
-        </div>
-      </div>
-
-      <!-- Price -->
-      <div style="margin-bottom:1rem;">
-        <span style="font-size:2rem;font-weight:900;color:{{ tcolor }};">€{{ '%.2f'|format(price_m)|replace('.',',') }}</span>
-        <span style="font-size:0.8rem;color:var(--text-muted);">/month</span>
-      </div>
-
-      <!-- Divider -->
-      <div style="height:1px;background:{{ tcolor }}22;margin-bottom:0.85rem;"></div>
-
-      <!-- Features -->
-      <ul class="tier-feat-list">
-        {% for ficon, fname, fdesc in features %}
-        {% set ftip = feature_tips.get(fname, '') %}
-        <li style="display:flex;align-items:flex-start;gap:0.5rem;" {% if ftip %}data-tip="{{ ftip }}"{% endif %}>
-          <span style="width:18px;text-align:center;flex-shrink:0;margin-top:0.05rem;">{{ ficon }}</span>
-          <div>
-            <span style="color:var(--text);font-weight:{% if fname.startswith('Everything') %}700{% else %}500{% endif %};">{{ fname }}</span>
-            {% if ftip %}<span class="ftip-icon">ⓘ</span>{% endif %}
-            {% if fdesc %}<div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.05rem;">{{ fdesc }}</div>{% endif %}
-          </div>
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
-    {% endfor %}
-  </div>
-
-  <!-- ── Checkout ── -->
-  <div style="text-align:center;margin-bottom:2rem;">
-    <form method="post" action="/guild/{{ guild.guild_id }}/billing/checkout" id="checkoutForm">
-      <input type="hidden" name="tier" id="selectedTier" value="clan">
-      <input type="hidden" name="plan" value="monthly">
-      <button type="submit" class="checkout-main" id="checkoutBtn">
-        🚀 Subscribe to Clan
-      </button>
-    </form>
-    <p style="font-size:0.78rem;color:var(--text-muted);margin-top:0.75rem;">
-      🎟️ Enter voucher at checkout &nbsp;·&nbsp; 🔒 Payment via Stripe &nbsp;·&nbsp; Cancel anytime
+  <!-- Hero -->
+  <div style="text-align:center;padding:2.5rem 1rem 2rem;">
+    <div style="font-size:3rem;margin-bottom:0.75rem;">☕</div>
+    <h1 style="font-size:2rem;font-weight:900;margin:0 0 0.5rem;">Support TravOps</h1>
+    <p style="color:var(--text-muted);font-size:0.95rem;max-width:480px;margin:0 auto;line-height:1.6;">
+      TravOps is a free, community-driven tool. If it helps your alliance, consider buying us a coffee — every contribution keeps the servers running and development going.
     </p>
   </div>
 
-  <!-- ── Comparison Footer ── -->
-  <div style="background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.18);border-radius:12px;padding:1rem 1.25rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
-    <div style="font-size:1.4rem;">⚔️</div>
-    <div style="flex:1;">
-      <div style="font-weight:600;font-size:0.9rem;margin-bottom:0.15rem;">Just looking for solo features?</div>
-      <div style="font-size:0.82rem;color:var(--text-muted);">Player Pro from €2.99/month — all personal features without a Discord server.</div>
-    </div>
-    <a href="/billing" style="white-space:nowrap;padding:0.5rem 1.1rem;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.35);border-radius:8px;color:#a5b4fc;text-decoration:none;font-size:0.85rem;font-weight:600;">
-      View Player Pro →
+  <!-- Donation Card -->
+  <div class="card" style="text-align:center;padding:2.5rem 2rem;margin-bottom:1.5rem;">
+    <div style="font-size:1.1rem;font-weight:700;margin-bottom:0.5rem;">Donate via PayPal</div>
+    <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1.75rem;">One-time · Any amount · No account needed</div>
+
+    <a href="https://www.paypal.com/pool/9qwS39JNPs?sr=wccr"
+       target="_blank" rel="noopener noreferrer"
+       style="display:inline-flex;align-items:center;gap:0.65rem;padding:0.85rem 2.25rem;
+              background:linear-gradient(135deg,#0070ba,#003087);
+              border-radius:12px;color:#fff;font-size:1rem;font-weight:700;
+              text-decoration:none;box-shadow:0 4px 20px rgba(0,112,186,0.35);
+              transition:opacity 0.15s,transform 0.15s;"
+       onmouseover="this.style.opacity='0.88';this.style.transform='translateY(-1px)'"
+       onmouseout="this.style.opacity='1';this.style.transform=''">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+        <path d="M7.02 21.875l.466-2.955.036.001c.05 0 .098.003.148.003 3.186 0 5.668-1.312 6.718-3.591.3-.656.5-1.39.563-2.201h.001c.09-.844-.04-1.573-.363-2.163.88.218 1.553.715 1.918 1.489.571 1.207.393 2.777-.455 4.097-.844 1.319-2.189 2.228-3.754 2.549l-.38 2.406c-.062.393-.4.681-.798.681H7.82a.435.435 0 01-.43-.506l-.37 2.19h.001zM18.985 6.49c.14.84.063 1.75-.27 2.618-.778 2.06-2.7 3.354-5.122 3.354h-.993a.773.773 0 00-.763.651L11.27 16.4l-.394 2.498a.428.428 0 01-.424.364H7.667a.435.435 0 01-.43-.506l1.907-12.088a.77.77 0 01.762-.651h5.166c1.527 0 2.74.424 3.54 1.23.274.275.507.583.673.943l-.3-.7z"/>
+      </svg>
+      Donate via PayPal Pool
     </a>
+
+    <div style="font-size:0.78rem;color:var(--text-muted);margin-top:1.25rem;">
+      Opens the TravOps PayPal pool in a new tab
+    </div>
   </div>
 
-  {% endif %}
+  <!-- What it pays for -->
+  <div class="card" style="padding:1.5rem;margin-bottom:1.5rem;">
+    <div style="font-size:0.85rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:1rem;">Your donation helps pay for</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.75rem;">
+      {% for icon, label in [('🖥️','Server costs'),('⚡','Bot uptime'),('🔧','New features'),('🛡️','Security updates')] %}
+      <div style="display:flex;align-items:center;gap:0.6rem;font-size:0.88rem;">
+        <span style="font-size:1.2rem;">{{ icon }}</span>
+        <span style="color:var(--text-muted);">{{ label }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div style="text-align:center;color:var(--text-muted);font-size:0.82rem;padding-bottom:2rem;">
+    Questions? <a href="mailto:support@travops.online" style="color:#3b82f6;text-decoration:none;">support@travops.online</a>
+  </div>
+
 </div>
-
-<script>
-let currentTier = 'clan';
-
-const TIER_COLORS = { starter:'#22c55e', clan:'#f59e0b', alliance:'#a855f7', imperium:'#ef4444' };
-const TIER_LABELS = { starter:'Starter', clan:'Plus', alliance:'Premium', imperium:'Imperium' };
-
-function selectTier(tid) {
-  currentTier = tid;
-  document.querySelectorAll('.tier-card').forEach(c => {
-    const sel = c.dataset.tier === tid;
-    c.classList.toggle('selected', sel);
-    if (sel) c.style.borderColor = TIER_COLORS[tid];
-    else c.style.borderColor = c.classList.contains('popular') ? TIER_COLORS[c.dataset.tier] : 'var(--border)';
-  });
-  document.getElementById('selectedTier').value = tid;
-  updateBtn();
-}
-
-function updateBtn() {
-  const btn = document.getElementById('checkoutBtn');
-  const label = TIER_LABELS[currentTier] || currentTier;
-  btn.textContent = `🚀 Subscribe to ${label}`;
-}
-
-selectTier('clan');
-</script>
 {% endblock %}
