@@ -15684,8 +15684,11 @@ async def hero_scout_manual_save(
     await _init_manual_hero_table()
 
     import aiosqlite, hashlib as _hl
+    from datetime import datetime as _dt, timedelta as _td
     db_path = Path("/app/data/scouter.db")
-    now = __import__("datetime").datetime.utcnow().isoformat()
+    _guild = await database.get_guild(guild_id)
+    _utc_offset_min = (_guild or {}).get("server_utc_offset", 60)
+    now = (_dt.utcnow() + _td(minutes=_utc_offset_min)).isoformat()
 
     reporter_name = session.get("username", "?")
     reporter_id   = session.get("user_id", "")
