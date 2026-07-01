@@ -8266,7 +8266,7 @@ async def my_ally_member_detail(request: Request, guild_id: str, discord_id: str
 async def enemy_troops_add(request: Request, guild_id: str, player_name: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     form = await request.form()
     off_troops    = int(form.get("off_troops")   or 0)
@@ -8290,7 +8290,7 @@ async def enemy_troops_add(request: Request, guild_id: str, player_name: str):
 async def enemy_troops_delete(request: Request, guild_id: str, player_name: str, entry_id: int):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.delete_enemy_troop_entry(entry_id, guild_id)
     return RedirectResponse(
@@ -8308,7 +8308,7 @@ async def enemy_villages_import(request: Request, guild_id: str, player_name: st
     from urllib.parse import unquote
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     form = await request.form()
     raw_text    = (form.get("profile_text") or "").strip()
@@ -8350,7 +8350,7 @@ async def enemy_add(request: Request, guild_id: str):
     """Manually add an enemy player to the kartei."""
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     form = await request.form()
     player_name   = (form.get("player_name") or "").strip()
@@ -13683,7 +13683,7 @@ async def set_report_channel(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.set_report_channel(guild_id, channel_id.strip() or None, channel_name.strip() or None)
     return RedirectResponse(f"/guild/{guild_id}/enemies?saved=report_channel", status_code=303)
@@ -13693,7 +13693,7 @@ async def set_report_channel(
 async def clear_report_channel(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.set_report_channel(guild_id, None, None)
     return RedirectResponse(f"/guild/{guild_id}/enemies?saved=report_channel_cleared", status_code=303)
@@ -13703,7 +13703,7 @@ async def clear_report_channel(request: Request, guild_id: str):
 async def create_report_channel(request: Request, guild_id: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     try:
         async with httpx.AsyncClient(timeout=15) as client:
@@ -14231,7 +14231,7 @@ async def enemy_update_notes(
 ):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.update_enemy_notes(guild_id, player_name, notes)
     return RedirectResponse(
@@ -14244,7 +14244,7 @@ async def enemy_village_detail_save(request: Request, guild_id: str, player_name
     """Save building/field detail for a specific village."""
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     import json as _json
     try:
@@ -14263,7 +14263,7 @@ async def enemy_village_detail_save(request: Request, guild_id: str, player_name
 async def enemy_delete(request: Request, guild_id: str, player_name: str):
     session, err = _require_session(request)
     if err: return err
-    err = _require_guild(session, guild_id)
+    err = await _require_guild_async(session, guild_id)
     if err: return err
     await database.delete_enemy(guild_id, player_name)
     return RedirectResponse(f"/guild/{guild_id}/enemies?saved=deleted", status_code=303)
