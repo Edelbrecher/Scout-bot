@@ -326,12 +326,13 @@ async def can_access_guild_async(session: dict, guild_id: str) -> bool:
     # Also grant access if user has joined an ally on this guild via invite link
     if uid:
         membership = await database.get_ally_membership(guild_id, uid)
+        print(f"[access] uid={uid} guild={guild_id} membership={membership}", flush=True)
         if membership:
             return True
-        # Accepted "Dual Accounts" invite — re-checked live so access disappears
-        # as soon as the owner revokes the link, without waiting for re-login.
         if await database.has_active_dual_link(guild_id, uid):
             return True
+    else:
+        print(f"[access] no uid in session, guild={guild_id} session_guilds={session.get('guilds')}", flush=True)
     return False
 
 
