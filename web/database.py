@@ -5855,6 +5855,23 @@ async def remove_ally_member(ally_group_id: int, discord_id: str):
         await db.commit()
 
 
+async def get_travian_names_by_discord_ids(guild_id: str, discord_ids: list[str]) -> dict[str, str]:
+    """Return {discord_id: travian_name} for the given discord_ids within a guild."""
+    if not discord_ids:
+        return {}
+    placeholders = ",".join("?" * len(discord_ids))
+    ally_group_id = await _get_ally_group_id(guild_id)
+    if not ally_group_id:
+        return {}
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            f"SELECT discord_id, travian_name FROM ally_members WHERE ally_group_id=? AND discord_id IN ({placeholders})",
+            [ally_group_id] + list(discord_ids),
+        ) as cur:
+            return {row["discord_id"]: row["travian_name"] for row in await cur.fetchall() if row["travian_name"]}
+
+
 async def get_ally_membership_guild_id(discord_id: str) -> str | None:
     """Return the guild_id of any approved ally membership for this user (latest joined)."""
     await _init_ally_tables()

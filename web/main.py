@@ -6450,6 +6450,15 @@ async def attacks_api_incoming(
             if coords:
                 a["own_village_x"] = coords["x"]
                 a["own_village_y"] = coords["y"]
+    # Enrich with importer's Travian name
+    discord_ids = list({a["imported_by_discord_id"] for a in attacks if a.get("imported_by_discord_id")})
+    if discord_ids:
+        travian_map = await database.get_travian_names_by_discord_ids(guild_id, discord_ids)
+        for a in attacks:
+            did = a.get("imported_by_discord_id")
+            if did and did in travian_map:
+                a["imported_by_travian_name"] = travian_map[did]
+
     all_artifacts = await database.get_artifacts(guild_id)
     active_arts = [a for a in all_artifacts if not a.get("is_target") and a.get("status") == "active"]
     if active_arts:

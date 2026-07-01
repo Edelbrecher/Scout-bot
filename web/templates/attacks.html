@@ -1563,11 +1563,11 @@
     for (const a of attacks) {
       const key = a.own_village_name || '?';
       if (!groups[key]) {
-        groups[key] = { name: a.own_village_name||'?', x: a.own_village_x, y: a.own_village_y, account: a.imported_by_name||'', attacks: [] };
+        groups[key] = { name: a.own_village_name||'?', x: a.own_village_x, y: a.own_village_y, account: a.imported_by_name||'', travian: a.imported_by_travian_name||'', attacks: [] };
       } else if (groups[key].x !== a.own_village_x || groups[key].y !== a.own_village_y) {
         groups[key].x = null; groups[key].y = null;
       }
-      if (!groups[key].account && a.imported_by_name) groups[key].account = a.imported_by_name;
+      if (!groups[key].account && a.imported_by_name) { groups[key].account = a.imported_by_name; groups[key].travian = a.imported_by_travian_name||''; }
       groups[key].attacks.push(a);
     }
     return groups;
@@ -1874,7 +1874,7 @@
           <span id="vc-arrow-${safeKey}" style="font-size:.5rem;color:var(--text-muted);flex-shrink:0;">${isCollapsed?'▶':'▼'}</span>
           <span style="font-size:.66rem;font-weight:700;color:var(--text);">🏰 ${escHtml(g.name)}</span>
           ${hasArt ? `<span style="font-size:.55rem;font-weight:800;padding:.08rem .35rem;border-radius:6px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);color:#fbbf24;">🏺 ${escHtml(artName)}</span>` : ''}
-          ${g.account ? `<span style="font-size:.56rem;color:#60a5fa;font-weight:600;">${escHtml(g.account)}</span>` : ''}
+          ${g.account ? `<span style="font-size:.56rem;color:#60a5fa;font-weight:600;">${escHtml(g.account)}${g.travian ? ` <span style="opacity:.7;">(${escHtml(g.travian)})</span>` : ''}</span>` : ''}
           <span style="font-size:.54rem;color:var(--text-muted);">${escHtml(coords)}</span>
           <div style="margin-left:auto;display:flex;align-items:center;gap:.25rem;flex-shrink:0;">
             <button onclick="event.stopPropagation();openVillageMap('${escHtml(key).replace(/'/g,"\\'")}')"
@@ -2139,7 +2139,7 @@
       <div style="padding:.65rem 1rem;border-bottom:1px solid var(--border);">
         <div style="font-size:.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem;">Target</div>
         <div style="font-size:.9rem;font-weight:700;">🏰 ${escHtml(a.own_village_name||'?')} ${defCoordStr}</div>
-        ${a.imported_by_name ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:.15rem;">👤 ${escHtml(a.imported_by_name)}</div>` : ''}
+        ${a.imported_by_name ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:.15rem;">👤 ${escHtml(a.imported_by_name)}${a.imported_by_travian_name ? ` <span style="color:var(--text-muted);opacity:.7;">(${escHtml(a.imported_by_travian_name)})</span>` : ''}</div>` : ''}
       </div>
 
       <!-- Arrival -->
@@ -2153,7 +2153,7 @@
       <!-- First seen -->
       <div style="padding:.4rem 1rem;border-bottom:1px solid var(--border);font-size:.72rem;color:var(--text-muted);">
         📥 First imported: <strong style="color:var(--text);">${a.import_time ? a.import_time.slice(0,16).replace('T',' ') : '—'}</strong>
-        ${a.imported_by_name ? ` by ${escHtml(a.imported_by_name)}` : ''}
+        ${a.imported_by_name ? ` by ${escHtml(a.imported_by_name)}${a.imported_by_travian_name ? ` (${escHtml(a.imported_by_travian_name)})` : ''}` : ''}
       </div>
 
       <!-- Troops -->
