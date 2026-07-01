@@ -1652,7 +1652,7 @@ def compute_rotation_state(players: list[dict], started_at_iso: str, now=None) -
     import datetime as _dt
     if not players:
         return None
-    holds = [max(1, int(p.get("hold_hours", 48) or 48)) for p in players]
+    holds = [max(1, int(p.get("hold_hours", 30) or 30)) for p in players]
     cycle_hours = sum(holds)
     if cycle_hours <= 0:
         return None

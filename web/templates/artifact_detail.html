@@ -162,7 +162,6 @@
         {% set current = artifact.current_holder %}
         {% for r in rotation %}{% if r.player_name == current %}{% set current_pos.val = loop.index0 %}{% endif %}{% endfor %}
       {% endif %}
-      {% set next_pos = (current_pos.val + 1) % (rotation|length) if current_pos.val >= 0 and rotation|length > 0 else -1 %}
       {% set member_lower = member_names | map('lower') | list %}
 
       {# Build a lookup of pending/confirmed handoffs by to_player #}
@@ -175,9 +174,18 @@
         {% endfor %}
       {% endif %}
 
-      {% for r in rotation %}
-      {% set is_current = loop.index0 == current_pos.val %}
-      {% set is_next = loop.index0 == next_pos %}
+      {# Reorder rotation so current holder is always first #}
+      {% set rot_ns = namespace(list=[]) %}
+      {% if current_pos.val > 0 %}
+        {% for r in rotation[current_pos.val:] %}{% set _ = rot_ns.list.append(r) %}{% endfor %}
+        {% for r in rotation[:current_pos.val] %}{% set _ = rot_ns.list.append(r) %}{% endfor %}
+      {% else %}
+        {% for r in rotation %}{% set _ = rot_ns.list.append(r) %}{% endfor %}
+      {% endif %}
+
+      {% for r in rot_ns.list %}
+      {% set is_current = loop.index0 == 0 and current_pos.val >= 0 %}
+      {% set is_next = loop.index0 == 1 and current_pos.val >= 0 and rot_ns.list|length > 1 %}
       {% set player_handoff = handoff_map.data.get(r.player_name) %}
       {% set has_confirmed = player_handoff and player_handoff.status == 'confirmed' %}
       <div class="rot-row {% if is_current %}current-holder{% elif is_next %}next-holder{% elif has_confirmed %}completed-holder{% endif %}"
@@ -253,12 +261,29 @@
           </div>
           {% endif %}
         </div>
+        {% if is_leader %}
+        <div class="rot-hours" style="display:flex;flex-direction:column;gap:.2rem;">
+          <div style="display:flex;align-items:center;gap:.25rem;">
+            <span style="font-size:.72rem;color:var(--text-muted);">⏱</span>
+            <input type="number" class="rot-hold-input" value="{{ r.hold_hours }}" min="1"
+              style="width:42px;background:var(--bg-input,#1e1f22);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:.72rem;padding:.1rem .3rem;text-align:center;"
+              oninput="onRowEdit(this)" title="Hold time (hours)">
+            <span style="font-size:.72rem;color:var(--text-muted);">h hold</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:.25rem;">
+            <span style="font-size:.72rem;color:var(--text-muted);">🔔</span>
+            <input type="number" class="rot-notify-input" value="{{ r.notify_hours }}" min="1"
+              style="width:42px;background:var(--bg-input,#1e1f22);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:.72rem;padding:.1rem .3rem;text-align:center;"
+              oninput="onRowEdit(this)" title="Notify hours before">
+            <span style="font-size:.72rem;color:var(--text-muted);">h before</span>
+          </div>
+        </div>
+        <button onclick="removeRotPlayer(this)" style="background:none;border:none;color:#f87171;cursor:pointer;padding:.2rem .3rem;font-size:1rem;" title="Remove">✕</button>
+        {% else %}
         <div class="rot-hours">
           <div>⏱ {{ r.hold_hours }}h hold</div>
           <div>🔔 {{ r.notify_hours }}h before</div>
         </div>
-        {% if is_leader %}
-        <button onclick="removeRotPlayer(this)" style="background:none;border:none;color:#f87171;cursor:pointer;padding:.2rem .3rem;font-size:1rem;" title="Remove">✕</button>
         {% endif %}
       </div>
       {% endfor %}
@@ -285,7 +310,7 @@
           <input id="newRotY" class="form-control" type="number" placeholder="Y" style="width:55px;" title="Village Y coord" oninput="rotCoordsLookup()">
           <button type="button" onclick="rotCoordsLookup()" class="btn btn-secondary" style="padding:.3rem .4rem;font-size:.7rem;" title="Lookup village">🔍</button>
         </div>
-        <input id="newHoldHours" class="form-control" type="number" value="48" min="1" placeholder="h" style="width:55px;" title="Hold time (hours)">
+        <input id="newHoldHours" class="form-control" type="number" value="30" min="1" placeholder="h" style="width:55px;" title="Hold time (hours)">
         <input id="newNotifyHours" class="form-control" type="number" value="6" min="1" placeholder="🔔" style="width:50px;" title="Notify hours before">
         <button onclick="addRotPlayer()" class="btn btn-secondary" style="padding:.35rem .65rem;font-size:.82rem;">+</button>
       </div>
@@ -768,7 +793,7 @@ document.addEventListener('click', e => {
 function addRotPlayer() {
   const name = document.getElementById('newRotPlayer').value.trim();
   if (!name) return;
-  const hold   = document.getElementById('newHoldHours').value || 48;
+  const hold   = document.getElementById('newHoldHours').value || 30;
   const notify = document.getElementById('newNotifyHours').value || 6;
   const vx = parseInt(document.getElementById('newRotX').value) || 0;
   const vy = parseInt(document.getElementById('newRotY').value) || 0;
@@ -790,10 +815,14 @@ function addRotPlayer() {
       warnBadge += ` <button onclick="copyInvite('${_escHtml(name).replace(/'/g,"\\'")}')" style="font-size:.66rem;font-weight:700;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.35);color:#a5b4fc;border-radius:8px;padding:1px 7px;cursor:pointer;">📨 Invite</button>`;
     }
   }
+  const inpStyle = 'width:42px;background:var(--bg-input,#1e1f22);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:.72rem;padding:.1rem .3rem;text-align:center;';
   div.innerHTML = `<span class="rot-handle">⠿</span>
     <div class="rot-pos">${pos}</div>
     <div class="rot-player"><div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap;">${_escHtml(name)} ${coordsLabel} <span class="rot-status" style="color:var(--text-muted);">⬜ Upcoming</span> ${warnBadge}</div></div>
-    <div class="rot-hours"><div>⏱ ${hold}h hold</div><div>🔔 ${notify}h before</div></div>
+    <div class="rot-hours" style="display:flex;flex-direction:column;gap:.2rem;">
+      <div style="display:flex;align-items:center;gap:.25rem;"><span style="font-size:.72rem;color:var(--text-muted);">⏱</span><input type="number" class="rot-hold-input" value="${hold}" min="1" style="${inpStyle}" oninput="onRowEdit(this)" title="Hold time (hours)"><span style="font-size:.72rem;color:var(--text-muted);">h hold</span></div>
+      <div style="display:flex;align-items:center;gap:.25rem;"><span style="font-size:.72rem;color:var(--text-muted);">🔔</span><input type="number" class="rot-notify-input" value="${notify}" min="1" style="${inpStyle}" oninput="onRowEdit(this)" title="Notify hours before"><span style="font-size:.72rem;color:var(--text-muted);">h before</span></div>
+    </div>
     <button onclick="removeRotPlayer(this)" style="background:none;border:none;color:#f87171;cursor:pointer;padding:.2rem .3rem;font-size:1rem;" title="Remove">✕</button>`;
   attachDrag(div);
   rotList.appendChild(div);
@@ -811,16 +840,29 @@ function removeRotPlayer(btn) {
   document.getElementById('saveRotBtn').style.display = 'inline-block';
 }
 
+function onRowEdit(inp) {
+  const row = inp.closest('.rot-row');
+  const holdInp = row.querySelector('.rot-hold-input');
+  const notifyInp = row.querySelector('.rot-notify-input');
+  if (holdInp)   row.dataset.hold   = holdInp.value;
+  if (notifyInp) row.dataset.notify = notifyInp.value;
+  document.getElementById('saveRotBtn').style.display = 'inline-block';
+}
+
 async function saveRotation() {
   const rows = rotList.querySelectorAll('.rot-row');
   const players = [];
-  rows.forEach(r => players.push({
-    player_name:  r.dataset.player,
-    hold_hours:   parseInt(r.dataset.hold) || 48,
-    notify_hours: parseInt(r.dataset.notify) || 6,
-    village_x:    parseInt(r.dataset.vx) || 0,
-    village_y:    parseInt(r.dataset.vy) || 0,
-  }));
+  rows.forEach(r => {
+    const holdInp = r.querySelector('.rot-hold-input');
+    const notifyInp = r.querySelector('.rot-notify-input');
+    players.push({
+      player_name:  r.dataset.player,
+      hold_hours:   parseInt(holdInp ? holdInp.value : r.dataset.hold) || 30,
+      notify_hours: parseInt(notifyInp ? notifyInp.value : r.dataset.notify) || 6,
+      village_x:    parseInt(r.dataset.vx) || 0,
+      village_y:    parseInt(r.dataset.vy) || 0,
+    });
+  });
   const res = await fetch(`/guild/${GUILD_ID}/artifacts/${ART_ID}/rotation/save`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({players})

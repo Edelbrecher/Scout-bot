@@ -12635,7 +12635,7 @@ async def _init_artifact_tables():
                 guild_id        TEXT NOT NULL,
                 position        INTEGER NOT NULL,
                 player_name     TEXT NOT NULL,
-                hold_hours      INTEGER DEFAULT 48,
+                hold_hours      INTEGER DEFAULT 30,
                 notify_hours    INTEGER DEFAULT 6,
                 UNIQUE(artifact_id, position)
             )
@@ -13344,7 +13344,7 @@ async def save_rotation(artifact_id: int, guild_id: str, players: list[dict]) ->
                   (artifact_id, guild_id, position, player_name, hold_hours, notify_hours, village_x, village_y)
                 VALUES (?,?,?,?,?,?,?,?)
             """, (artifact_id, guild_id, i, p.get("player_name",""),
-                  int(p.get("hold_hours", 48)), int(p.get("notify_hours", 6)),
+                  int(p.get("hold_hours", 30)), int(p.get("notify_hours", 6)),
                   int(p.get("village_x", 0) or 0), int(p.get("village_y", 0) or 0)))
         await db.commit()
     return True
@@ -13363,7 +13363,7 @@ def compute_rotation_state(players: list[dict], started_at_iso: str, now=None) -
     import datetime as _dt
     if not players:
         return None
-    holds = [max(1, int(p.get("hold_hours", 48) or 48)) for p in players]
+    holds = [max(1, int(p.get("hold_hours", 30) or 30)) for p in players]
     cycle_hours = sum(holds)
     if cycle_hours <= 0:
         return None
