@@ -204,6 +204,31 @@
         Laufzeiten berechnen
       </button>
 
+      {# ── Village Check ── #}
+      <button onclick="toggleDefEdit('vcheck-{{ ch.channel_id }}')"
+        style="margin-top:0.5rem;margin-left:0.35rem;display:inline-flex;align-items:center;gap:0.35rem;background:none;border:1px solid rgba(99,102,241,.3);border-radius:5px;padding:0.25rem 0.65rem;color:#a5b4fc;font-size:0.76rem;cursor:pointer;">
+        🔍 Village Check
+      </button>
+
+      <div id="vcheck-{{ ch.channel_id }}" style="display:none;margin-top:0.65rem;border-top:1px solid var(--border);padding-top:0.65rem;">
+        <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:0.4rem;">
+          🔍 Village Troop Check
+        </div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.5rem;">
+          Travian "Truppen im Dorf"-Übersicht einfügen — erkennt automatisch wer geschickt hat.
+        </div>
+        <textarea id="vpaste-{{ ch.channel_id }}"
+          placeholder="Troops in this village… (aus Travian kopieren)"
+          style="width:100%;height:120px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.15);border-radius:6px;
+                 color:var(--text);font-size:0.75rem;padding:0.5rem;resize:vertical;font-family:monospace;box-sizing:border-box;"></textarea>
+        <button onclick="runVillageCheck('{{ ch.channel_id }}')"
+          style="margin-top:0.4rem;background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.4);border-radius:5px;
+                 padding:0.3rem 0.9rem;color:#a5b4fc;font-size:0.8rem;font-weight:600;cursor:pointer;">
+          ✅ Auswerten
+        </button>
+        <div id="vresult-{{ ch.channel_id }}" style="margin-top:0.65rem;"></div>
+      </div>
+
       {# ── Request bearbeiten (can_close = Lead/HC/Admin) ── #}
       {% if can_close %}
       <div id="req-{{ ch.channel_id }}" style="display:none;margin-top:0.65rem;border-top:1px solid var(--border);padding-top:0.65rem;">
@@ -357,6 +382,12 @@
         </div>
       </div>
       {% endif %}
+
+      {# Defender-Namen als hidden JS-Daten für Village Check #}
+      <script>
+      (window._vcheckDefenders = window._vcheckDefenders || {})['{{ ch.channel_id }}'] =
+        [{% for c in contributions.get(ch.channel_id, []) %}"{{ c.user_name|e }}"{% if not loop.last %},{% endif %}{% endfor %}];
+      </script>
 
     </div>
     {% endfor %}
@@ -648,6 +679,96 @@ function fmtSendTime(arrivalStr, secs) {
 function toggleDefEdit(id) {
   const el = document.getElementById(id);
   if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+// ── Village Troop Check ──────────────────────────────────────────────────────
+function parseTroopOverview(text) {
+  // Strip Unicode RTL/LTR marks and normalize whitespace
+  const clean = text.replace(/[‎‏‪-‮⁦-⁩­]/g, '');
+  const lines = clean.split('\n').map(l => l.trim()).filter(l => l);
+  const players = {}; // { name: totalTroops }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Pattern: anything + tab/2+spaces + PlayerName's troops
+    // Or: "PlayerName's troops" anywhere on a line (after village name with tab)
+    const m = line.match(/^.+?[\t]{1,}(.+?)'s\s+troops$/i)
+           || line.match(/^(.+?)'s\s+troops$/i);
+    if (!m) continue;
+    const playerName = m[1].trim();
+    if (!playerName || /^own$/i.test(playerName)) continue;
+
+    // Find "Troops" line in the next 3 lines
+    for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+      const tm = lines[j].match(/^Troops[\t\s]+(.+)$/i);
+      if (!tm) continue;
+      const nums = tm[1].split(/[\t\s]+/)
+        .map(s => parseInt(s.replace(/[^0-9]/g, '')) || 0);
+      const total = nums.reduce((a, b) => a + b, 0);
+      players[playerName] = (players[playerName] || 0) + total;
+      break;
+    }
+  }
+  return players;
+}
+
+function runVillageCheck(channelId) {
+  const textarea = document.getElementById('vpaste-' + channelId);
+  const resultEl = document.getElementById('vresult-' + channelId);
+  if (!textarea || !resultEl) return;
+
+  const parsed = parseTroopOverview(textarea.value);
+  const playerNames = Object.keys(parsed);
+
+  if (!playerNames.length) {
+    resultEl.innerHTML = '<div style="color:#f87171;font-size:0.8rem;">⚠️ Keine Spieler erkannt — bitte die Travian "Truppen im Dorf"-Übersicht einfügen.</div>';
+    return;
+  }
+
+  const defenders = (window._vcheckDefenders || {})[channelId] || [];
+  const parsedLower = {};
+  for (const [name, cnt] of Object.entries(parsed)) parsedLower[name.toLowerCase()] = { name, cnt };
+
+  // Check each registered defender
+  const defRows = defenders.map(dname => {
+    const hit = parsedLower[dname.toLowerCase()];
+    if (hit) {
+      return `<div style="display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;padding:0.2rem 0;">
+        <span style="color:#4ade80;font-size:1rem;">✅</span>
+        <span style="font-weight:600;min-width:130px;">${dname}</span>
+        <span style="color:#93c5fd;">${hit.cnt.toLocaleString('de-DE')} Truppen im Dorf</span>
+      </div>`;
+    } else {
+      return `<div style="display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;padding:0.2rem 0;">
+        <span style="color:#f87171;font-size:1rem;">❌</span>
+        <span style="font-weight:600;min-width:130px;color:#f87171;">${dname}</span>
+        <span style="color:var(--text-muted);">nicht im Dorf</span>
+      </div>`;
+    }
+  });
+
+  // Players in village NOT in defenders list
+  const defLower = new Set(defenders.map(d => d.toLowerCase()));
+  const extra = playerNames.filter(n => !defLower.has(n.toLowerCase()));
+  const extraRows = extra.map(n =>
+    `<div style="display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;padding:0.2rem 0;opacity:.7;">
+      <span style="font-size:1rem;">➕</span>
+      <span style="min-width:130px;color:var(--text-muted);">${n}</span>
+      <span style="color:#93c5fd;">${parsed[n].toLocaleString('de-DE')} — nicht im Call</span>
+    </div>`
+  );
+
+  const totalPlayers = playerNames.length;
+  const confirmed = defenders.filter(d => parsedLower[d.toLowerCase()]).length;
+
+  resultEl.innerHTML = `
+    <div style="background:rgba(99,102,241,.07);border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:0.75rem 1rem;">
+      <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:0.5rem;">
+        Ergebnis · ${totalPlayers} Spieler im Dorf · ${confirmed}/${defenders.length} eingetragene Defender angekommen
+      </div>
+      ${defRows.length ? defRows.join('') : '<div style="font-size:0.8rem;color:var(--text-muted);">Keine eingetragenen Defender für diesen Call.</div>'}
+      ${extraRows.length ? `<div style="border-top:1px solid rgba(255,255,255,.06);margin-top:0.5rem;padding-top:0.5rem;">${extraRows.join('')}</div>` : ''}
+    </div>`;
 }
 </script>
 {% endblock %}
