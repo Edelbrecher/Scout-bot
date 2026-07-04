@@ -1192,23 +1192,35 @@ async def handle_announce_ep_cancelled(request: aiohttp_web.Request) -> aiohttp_
 
 
 async def _get_or_create_archive_category(guild: discord.Guild) -> discord.CategoryChannel:
-    """Return the '📦 Archiv' category, creating it if needed."""
-    ARCHIVE_NAME = "📦 Archiv"
-    for cat in guild.categories:
-        if cat.name == ARCHIVE_NAME:
+    """Return an archive category with room for at least one more channel.
+    Creates numbered overflow categories when the current one is full (Discord limit: 50)."""
+    ARCHIVE_BASE = "📦 Archiv"
+    DISCORD_CAT_LIMIT = 50
+
+    # Collect all archive categories sorted by name so we try the lowest-numbered first
+    archive_cats = sorted(
+        [c for c in guild.categories if c.name == ARCHIVE_BASE or c.name.startswith(ARCHIVE_BASE + " ")],
+        key=lambda c: c.name,
+    )
+
+    # Return the first category that still has room
+    for cat in archive_cats:
+        if len(cat.channels) < DISCORD_CAT_LIMIT:
             return cat
-    # Create with restricted permissions — only bot + admins see it
+
+    # All existing categories are full (or none exist) — create a new one
+    suffix = len(archive_cats) + 1
+    new_name = ARCHIVE_BASE if suffix == 1 else f"{ARCHIVE_BASE} {suffix}"
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(view_channel=False),
         guild.me: discord.PermissionOverwrite(
             view_channel=True, send_messages=True, manage_channels=True,
         ),
     }
-    # Grant view to anyone who already had it (admins etc.) by inheriting nothing
     return await guild.create_category(
-        ARCHIVE_NAME,
+        new_name,
         overwrites=overwrites,
-        reason="Defend-Archiv-Kategorie automatisch erstellt",
+        reason="Defend-Archiv-Kategorie automatisch erstellt (Überlauf)",
     )
 
 
