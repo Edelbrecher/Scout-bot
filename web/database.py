@@ -537,6 +537,7 @@ async def init_db():
     await _init_artifact_tables()
     await _init_grain_sim_table()
     await _init_feature_matrix_table()
+    await _init_defend_public_links_table()
 
     # New column migrations
     async with aiosqlite.connect(DB_PATH, timeout=30) as db:
@@ -14366,3 +14367,76 @@ async def delete_grain_simulation(guild_id: str, sim_id: int, discord_id: str,
             )
         await db.commit()
         return cur.rowcount > 0
+
+
+# ── Defend Public Links ────────────────────────────────────────────────────────
+
+async def _init_defend_public_links_table():
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS defend_public_links (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                token           TEXT UNIQUE NOT NULL,
+                guild_id        TEXT NOT NULL,
+                name            TEXT DEFAULT '',
+                channel_ids     TEXT NOT NULL DEFAULT '[]',
+                created_by_id   TEXT DEFAULT '',
+                created_by_name TEXT DEFAULT '',
+                created_at      TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        await db.commit()
+
+
+async def create_defend_public_link(guild_id: str, name: str, channel_ids: list,
+                                     created_by_id: str, created_by_name: str) -> dict:
+    import secrets, json as _json
+    token = secrets.token_urlsafe(10)
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute("""
+            INSERT INTO defend_public_links (token, guild_id, name, channel_ids, created_by_id, created_by_name)
+            VALUES (?,?,?,?,?,?)
+        """, (token, guild_id, name, _json.dumps(channel_ids), created_by_id, created_by_name))
+        await db.commit()
+        async with db.execute("SELECT * FROM defend_public_links WHERE id=?", (cur.lastrowid,)) as c:
+            row = await c.fetchone()
+            return dict(row) if row else {}
+
+
+async def get_defend_public_links(guild_id: str) -> list[dict]:
+    import json as _json
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT * FROM defend_public_links WHERE guild_id=? ORDER BY created_at DESC
+        """, (guild_id,)) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+    for r in rows:
+        try:
+            r['channel_ids'] = _json.loads(r['channel_ids'])
+        except Exception:
+            r['channel_ids'] = []
+    return rows
+
+
+async def get_defend_public_link_by_token(token: str) -> dict | None:
+    import json as _json
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM defend_public_links WHERE token=?", (token,)) as cur:
+            row = await cur.fetchone()
+            if not row:
+                return None
+            r = dict(row)
+    try:
+        r['channel_ids'] = _json.loads(r['channel_ids'])
+    except Exception:
+        r['channel_ids'] = []
+    return r
+
+
+async def delete_defend_public_link(link_id: int, guild_id: str):
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("DELETE FROM defend_public_links WHERE id=? AND guild_id=?", (link_id, guild_id))
+        await db.commit()

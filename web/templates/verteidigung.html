@@ -18,6 +18,11 @@
       <a href="/guild/{{ guild.guild_id }}/defense/hero-scout" class="btn btn-secondary" style="font-size:.68rem;padding:.2rem .45rem;border-color:rgba(245,158,11,.3);color:#f59e0b;">
         <span data-i18n="defense.heroscout.btn">🗡️ Hero Scout</span>
       </a>
+      {% if can_close %}
+      <button onclick="openLinkManager()" style="font-size:.68rem;padding:.2rem .45rem;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.3);border-radius:6px;color:#a5b4fc;cursor:pointer;font-weight:600;">
+        🔗 Public Links
+      </button>
+      {% endif %}
     </div>
   </div>
 
@@ -102,6 +107,11 @@
     <div class="card" style="border-left:3px solid {% if ch.type == 'timed_defend' %}rgba(249,115,22,0.6){% else %}rgba(239,68,68,0.6){% endif %};">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;">
         <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+          {% if can_close %}
+          <input type="checkbox" class="pub-link-cb" value="{{ ch.channel_id }}"
+            style="width:15px;height:15px;accent-color:#6366f1;cursor:pointer;flex-shrink:0;"
+            title="Für Public Link markieren" onchange="updateLinkSelectionBar()">
+          {% endif %}
           <span style="font-size:0.75rem;font-weight:700;
             background:{% if ch.type == 'timed_defend' %}rgba(249,115,22,0.15){% else %}rgba(239,68,68,0.15){% endif %};
             color:{% if ch.type == 'timed_defend' %}#f97316{% else %}#ef4444{% endif %};
@@ -405,6 +415,75 @@
 
 </div>
 
+{# ── Selection bar: erscheint wenn Calls markiert sind ── #}
+{% if can_close %}
+<div id="pub-link-bar" style="display:none;position:fixed;bottom:1.25rem;left:50%;transform:translateX(-50%);
+     background:#1a1d2e;border:1px solid rgba(99,102,241,.5);border-radius:12px;
+     padding:0.65rem 1.25rem;display:none;align-items:center;gap:0.75rem;z-index:900;
+     box-shadow:0 4px 24px rgba(0,0,0,.5);">
+  <span id="pub-link-bar-count" style="font-size:0.82rem;color:#a5b4fc;font-weight:600;"></span>
+  <button onclick="openLinkManager()"
+    style="background:rgba(99,102,241,.25);border:1px solid rgba(99,102,241,.5);border-radius:7px;
+           padding:0.35rem 1rem;color:#a5b4fc;font-size:0.82rem;font-weight:700;cursor:pointer;">
+    🔗 Public Link erstellen
+  </button>
+  <button onclick="clearLinkSelection()"
+    style="background:none;border:1px solid rgba(255,255,255,.15);border-radius:7px;
+           padding:0.35rem 0.7rem;color:var(--text-muted);font-size:0.78rem;cursor:pointer;">
+    ✕
+  </button>
+</div>
+{% endif %}
+
+{# ── Public Link Manager Modal ── #}
+{% if can_close %}
+<div id="link-manager-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:1100;overflow-y:auto;padding:1.5rem 1rem;">
+  <div style="max-width:620px;margin:auto;background:#1a1d2e;border:1px solid var(--border);border-radius:12px;padding:1.5rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.1rem;">
+      <div style="font-size:1rem;font-weight:700;">🔗 Public Links</div>
+      <button onclick="closeLinkManager()" style="background:none;border:none;color:var(--text-muted);font-size:1.2rem;cursor:pointer;">✕</button>
+    </div>
+
+    {# Create new link #}
+    <div style="background:rgba(99,102,241,.07);border:1px solid rgba(99,102,241,.2);border-radius:8px;padding:1rem;margin-bottom:1.25rem;">
+      <div style="font-size:0.78rem;font-weight:700;color:#a5b4fc;margin-bottom:0.65rem;text-transform:uppercase;letter-spacing:.04em;">
+        Neuen Link erstellen
+      </div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.5rem;" id="link-selected-info">
+        Keine Calls ausgewählt — Checkboxen an den Calls aktivieren.
+      </div>
+      <input id="link-name-input" type="text" placeholder="Name (optional, z.B. "03 Rev – 15 Jul")"
+        style="width:100%;padding:0.45rem 0.7rem;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);
+               border-radius:6px;color:var(--text);font-size:0.85rem;margin-bottom:0.6rem;box-sizing:border-box;">
+      <button onclick="createPublicLink()"
+        style="background:rgba(99,102,241,.25);border:1px solid rgba(99,102,241,.5);border-radius:7px;
+               padding:0.4rem 1.1rem;color:#a5b4fc;font-size:0.85rem;font-weight:700;cursor:pointer;">
+        🔗 Link generieren
+      </button>
+      <div id="link-result" style="margin-top:0.75rem;display:none;">
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.25rem;">Link (klicken zum Kopieren):</div>
+        <div id="link-result-url" onclick="copyLink(this)"
+          style="font-family:monospace;font-size:0.8rem;padding:0.5rem 0.75rem;background:rgba(34,197,94,.07);
+                 border:1px solid rgba(34,197,94,.3);border-radius:6px;color:#4ade80;cursor:pointer;word-break:break-all;">
+        </div>
+        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.25rem;">Klicken zum Kopieren</div>
+      </div>
+    </div>
+
+    {# Existing links #}
+    <div>
+      <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:0.65rem;">
+        Bestehende Links
+      </div>
+      <div id="existing-links-list">
+        <div style="font-size:0.8rem;color:var(--text-muted);">Lade…</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endif %}
+
 {# ── Laufzeit-Modal ── #}
 <div id="travel-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;overflow-y:auto;padding:1.5rem 1rem;">
   <div style="max-width:700px;margin:auto;background:#1a1d2e;border:1px solid var(--border);border-radius:10px;padding:1.25rem;">
@@ -680,6 +759,117 @@ function toggleDefEdit(id) {
   const el = document.getElementById(id);
   if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
+
+// ── Public Link Manager ──────────────────────────────────────────────────────
+const GUILD_ID_DEF = '{{ guild.guild_id }}';
+
+function getSelectedChannels() {
+  return Array.from(document.querySelectorAll('.pub-link-cb:checked')).map(cb => cb.value);
+}
+
+function updateLinkSelectionBar() {
+  const sel = getSelectedChannels();
+  const bar = document.getElementById('pub-link-bar');
+  const count = document.getElementById('pub-link-bar-count');
+  if (!bar) return;
+  if (sel.length > 0) {
+    bar.style.display = 'flex';
+    count.textContent = sel.length + ' Call' + (sel.length > 1 ? 's' : '') + ' ausgewählt';
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+function clearLinkSelection() {
+  document.querySelectorAll('.pub-link-cb').forEach(cb => cb.checked = false);
+  updateLinkSelectionBar();
+}
+
+function openLinkManager() {
+  const sel = getSelectedChannels();
+  const infoEl = document.getElementById('link-selected-info');
+  if (infoEl) {
+    infoEl.textContent = sel.length
+      ? sel.length + ' Call(s) ausgewählt für den neuen Link.'
+      : 'Keine Calls ausgewählt — Checkboxen aktivieren.';
+  }
+  const res = document.getElementById('link-result');
+  if (res) res.style.display = 'none';
+  document.getElementById('link-manager-modal').style.display = 'block';
+  loadExistingLinks();
+}
+
+function closeLinkManager() {
+  document.getElementById('link-manager-modal').style.display = 'none';
+}
+
+async function createPublicLink() {
+  const sel = getSelectedChannels();
+  if (!sel.length) { alert('Bitte mindestens einen Call auswählen.'); return; }
+  const name = (document.getElementById('link-name-input').value || '').trim();
+  const resp = await fetch(`/guild/${GUILD_ID_DEF}/defense/public-links/create`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name, channel_ids: sel}),
+  });
+  const data = await resp.json();
+  if (!data.ok) { alert('Fehler: ' + (data.error || 'unbekannt')); return; }
+  const url = location.origin + '/defense/public/' + data.token;
+  const resEl = document.getElementById('link-result');
+  const urlEl = document.getElementById('link-result-url');
+  urlEl.textContent = url;
+  urlEl.dataset.url = url;
+  resEl.style.display = 'block';
+  clearLinkSelection();
+  loadExistingLinks();
+}
+
+function copyLink(el) {
+  const url = el.dataset.url || el.textContent;
+  navigator.clipboard.writeText(url).then(() => {
+    const orig = el.textContent;
+    el.textContent = '✅ Kopiert!';
+    setTimeout(() => el.textContent = orig, 1800);
+  });
+}
+
+async function deletePublicLink(linkId) {
+  if (!confirm('Link löschen?')) return;
+  const resp = await fetch(`/guild/${GUILD_ID_DEF}/defense/public-links/${linkId}/delete`, {method:'POST'});
+  const data = await resp.json();
+  if (data.ok) loadExistingLinks();
+}
+
+async function loadExistingLinks() {
+  const el = document.getElementById('existing-links-list');
+  if (!el) return;
+  const resp = await fetch(`/guild/${GUILD_ID_DEF}/defense/public-links/list`);
+  const data = await resp.json();
+  if (!data.ok || !data.links.length) {
+    el.innerHTML = '<div style="font-size:0.8rem;color:var(--text-muted);">Noch keine Links erstellt.</div>';
+    return;
+  }
+  el.innerHTML = data.links.map(l => {
+    const url = location.origin + '/defense/public/' + l.token;
+    const chCount = (l.channel_ids || []).length;
+    return `<div style="display:flex;align-items:center;gap:0.5rem;padding:0.45rem 0;border-bottom:1px solid rgba(255,255,255,.05);flex-wrap:wrap;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:0.82rem;font-weight:600;">${l.name || '(kein Name)'}</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);">${chCount} Call(s) · ${l.created_at.slice(0,16).replace('T',' ')} · ${l.created_by_name}</div>
+        <div onclick="navigator.clipboard.writeText('${url}').then(()=>{})"
+             style="font-family:monospace;font-size:0.72rem;color:#6366f1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+             title="Klicken zum Kopieren">${url}</div>
+      </div>
+      <a href="${url}" target="_blank" style="font-size:0.75rem;padding:0.25rem 0.65rem;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);border-radius:5px;color:#a5b4fc;text-decoration:none;">Öffnen</a>
+      <button onclick="deletePublicLink(${l.id})" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:5px;padding:0.25rem 0.55rem;color:#f87171;font-size:0.75rem;cursor:pointer;">🗑️</button>
+    </div>`;
+  }).join('');
+}
+
+document.addEventListener('click', e => {
+  const modal = document.getElementById('link-manager-modal');
+  if (modal && e.target === modal) closeLinkManager();
+});
 
 // ── Village Troop Check ──────────────────────────────────────────────────────
 function parseTroopOverview(text) {

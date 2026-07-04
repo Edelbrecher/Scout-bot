@@ -14033,6 +14033,109 @@ async def defend_update_request(request: Request, guild_id: str, channel_id: str
     return RedirectResponse(f"/guild/{guild_id}/verteidigung?show={show}&flash=saved", status_code=303)
 
 
+# ── Defend Public Links ───────────────────────────────────────────────────────
+
+@app.post("/guild/{guild_id}/defense/public-links/create")
+async def defend_public_link_create(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"ok": False}, status_code=401)
+    err = await _require_guild_async(session, guild_id)
+    if err: return JSONResponse({"ok": False}, status_code=403)
+    uid = session.get("uid", "")
+    guild = await database.get_guild(guild_id)
+    perms = await database.get_member_permissions(guild_id, uid)
+    is_admin = session.get("type") == "admin"
+    is_owner = guild and guild.get("owner_discord_id") == uid
+    has_rights = "defend_manage" in perms or "ally_manage" in perms or is_admin or is_owner
+    if not has_rights:
+        return JSONResponse({"ok": False, "error": "no permission"}, status_code=403)
+    import json as _json
+    data = await request.json()
+    name = str(data.get("name", "")).strip()[:80]
+    channel_ids = [str(c) for c in (data.get("channel_ids") or [])]
+    if not channel_ids:
+        return JSONResponse({"ok": False, "error": "no channels selected"})
+    user_name = session.get("username", "?")
+    link = await database.create_defend_public_link(guild_id, name, channel_ids, uid, user_name)
+    return JSONResponse({"ok": True, "token": link["token"], "id": link["id"]})
+
+
+@app.post("/guild/{guild_id}/defense/public-links/{link_id}/delete")
+async def defend_public_link_delete(request: Request, guild_id: str, link_id: int):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"ok": False}, status_code=401)
+    err = await _require_guild_async(session, guild_id)
+    if err: return JSONResponse({"ok": False}, status_code=403)
+    uid = session.get("uid", "")
+    guild = await database.get_guild(guild_id)
+    perms = await database.get_member_permissions(guild_id, uid)
+    is_admin = session.get("type") == "admin"
+    is_owner = guild and guild.get("owner_discord_id") == uid
+    has_rights = "defend_manage" in perms or "ally_manage" in perms or is_admin or is_owner
+    if not has_rights:
+        return JSONResponse({"ok": False, "error": "no permission"}, status_code=403)
+    await database.delete_defend_public_link(link_id, guild_id)
+    return JSONResponse({"ok": True})
+
+
+@app.get("/defense/public/{token}", response_class=HTMLResponse)
+async def defend_public_view(request: Request, token: str):
+    """Public read-only view of selected defend calls — no login required."""
+    link = await database.get_defend_public_link_by_token(token)
+    if not link:
+        return HTMLResponse("<h2 style='font-family:sans-serif;padding:2rem;'>Link not found or expired.</h2>", status_code=404)
+
+    channel_ids = link["channel_ids"]
+    guild_id = link["guild_id"]
+
+    # Load channels + contributions for the selected channel_ids
+    all_channels = await database.get_defend_channels(guild_id)
+    channels = [c for c in all_channels if c["channel_id"] in channel_ids]
+
+    contributions = await database.get_defend_contributions_for_guild(guild_id)
+
+    # Build coverage info (same logic as verteidigung page)
+    import re as _re
+    def _parse_goal(g: str) -> int:
+        if not g: return 0
+        g2 = g.strip().upper().replace(".","").replace(",","").replace(" ","")
+        m = _re.match(r"(\d+(?:\.\d+)?)(K|M)?", g2)
+        if not m: return 0
+        n = float(m.group(1))
+        if m.group(2) == "K": n *= 1000
+        elif m.group(2) == "M": n *= 1_000_000
+        return int(n)
+
+    for ch in channels:
+        ch_contribs = contributions.get(ch["channel_id"], [])
+        ch["grain_sent"] = sum(c.get("total_grain", 0) or 0 for c in ch_contribs)
+        ch["defenders"] = len(ch_contribs)
+        ch["goal_parsed"] = _parse_goal(ch.get("goal", ""))
+        if ch["goal_parsed"] > 0:
+            ch["coverage_pct"] = min(round(ch["grain_sent"] / ch["goal_parsed"] * 100), 999)
+        else:
+            ch["coverage_pct"] = 0
+
+    guild = await database.get_guild(guild_id)
+    return templates.TemplateResponse("defend_public.html", {
+        "request": request,
+        "link": link,
+        "guild": guild,
+        "channels": channels,
+        "contributions": contributions,
+    })
+
+
+@app.get("/guild/{guild_id}/defense/public-links/list")
+async def defend_public_links_list(request: Request, guild_id: str):
+    session, err = _require_session(request)
+    if err: return JSONResponse({"ok": False}, status_code=401)
+    err = await _require_guild_async(session, guild_id)
+    if err: return JSONResponse({"ok": False}, status_code=403)
+    links = await database.get_defend_public_links(guild_id)
+    return JSONResponse({"ok": True, "links": links})
+
+
 @app.post("/api/village-ts")
 async def api_save_village_ts(request: Request):
     session, err = _require_session(request)

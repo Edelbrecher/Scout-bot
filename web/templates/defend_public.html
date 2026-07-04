@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if link.name %}{{ link.name }} · {% endif %}Defense · TravOps</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png">
+  <link rel="stylesheet" href="/static/style.css?v=20260613a">
+  <style>
+    body { background: var(--bg-main); color: var(--text); font-family: var(--font); }
+    .pub-header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+
+<div class="pub-header">
+  <img src="/static/favicon.png" style="width:24px;height:24px;border-radius:4px;" onerror="this.style.display='none'">
+  <div>
+    <div style="font-weight:700;font-size:0.95rem;">
+      🛡️ {% if link.name %}{{ link.name }}{% else %}Defense Overview{% endif %}
+    </div>
+    <div style="font-size:0.72rem;color:var(--text-muted);">
+      {{ guild.guild_name }} · read-only
+    </div>
+  </div>
+</div>
+
+<div class="container" style="max-width:860px;padding-top:1.25rem;">
+
+  {% if not channels %}
+  <div class="card">
+    <p style="color:var(--text-muted);margin:0;">No defend calls found.</p>
+  </div>
+  {% endif %}
+
+  <div style="display:grid;gap:0.75rem;">
+  {% for ch in channels %}
+  <div class="card" style="border-left:3px solid {% if ch.type == 'timed_defend' %}rgba(249,115,22,0.6){% else %}rgba(239,68,68,0.6){% endif %};">
+
+    <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem;">
+      <span style="font-size:0.75rem;font-weight:700;
+        background:{% if ch.type == 'timed_defend' %}rgba(249,115,22,0.15){% else %}rgba(239,68,68,0.15){% endif %};
+        color:{% if ch.type == 'timed_defend' %}#f97316{% else %}#ef4444{% endif %};
+        border-radius:4px;padding:0.15rem 0.5rem;">
+        {% if ch.type == 'timed_defend' %}⏱️ Timed-Defend{% else %}🛡️ Defend{% endif %}
+      </span>
+      {% if ch.status == 'closed' %}
+      <span style="font-size:0.75rem;background:rgba(34,197,94,0.1);color:#22c55e;border-radius:4px;padding:0.15rem 0.5rem;">✅ Done</span>
+      {% else %}
+      <span style="font-size:0.75rem;background:rgba(239,68,68,0.1);color:#f87171;border-radius:4px;padding:0.15rem 0.5rem;">🔴 Open</span>
+      {% endif %}
+      <span style="font-size:0.72rem;color:var(--text-muted);margin-left:auto;">{{ ch.created_at[:16].replace('T',' ') }} UTC</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.5rem;margin-bottom:0.6rem;">
+      <div>
+        <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Attacker</div>
+        <div style="font-weight:600;color:#f87171;">{{ ch.attacker or '—' }}</div>
+      </div>
+      <div>
+        <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Target</div>
+        <div style="font-family:monospace;color:#93c5fd;">{{ ch.coords or '—' }}</div>
+      </div>
+      <div>
+        <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Arrival</div>
+        <div style="font-weight:600;color:#f59e0b;">{{ ch.arrival_time or '—' }}</div>
+      </div>
+      {% if ch.goal %}
+      <div>
+        <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">🎯 Goal</div>
+        <div style="font-weight:600;">{{ ch.goal }}</div>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if ch.notes %}
+    <div style="margin-bottom:0.6rem;font-size:0.82rem;color:var(--text-muted);
+                background:rgba(255,255,255,0.03);border-radius:5px;padding:0.4rem 0.6rem;">
+      {{ ch.notes }}
+    </div>
+    {% endif %}
+
+    {# Coverage bar #}
+    {% if ch.goal_parsed and ch.goal_parsed > 0 %}
+    {% set cpct = ch.coverage_pct %}
+    {% set barcol = '#22c55e' if cpct >= 100 else ('#f59e0b' if cpct >= 50 else '#ef4444') %}
+    <div style="margin-bottom:0.65rem;">
+      <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--text-muted);margin-bottom:0.25rem;">
+        <span>🎯 Coverage — <strong style="color:var(--text);">{{ "{:,}".format(ch.grain_sent).replace(",",".") }}</strong> / {{ "{:,}".format(ch.goal_parsed).replace(",",".") }} Crop · {{ ch.defenders }} defenders</span>
+        <span style="font-weight:800;color:{{ barcol }};">{{ cpct }}%{% if cpct >= 100 %} ✅{% endif %}</span>
+      </div>
+      <div style="height:9px;background:rgba(255,255,255,.08);border-radius:5px;overflow:hidden;">
+        <div style="height:100%;width:{{ [cpct,100]|min }}%;background:{{ barcol }};border-radius:5px;"></div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# Defender list #}
+    {% set ch_contribs = contributions.get(ch.channel_id, []) %}
+    {% if ch_contribs %}
+    {% set total_troops = ch_contribs | sum(attribute='total_troops') %}
+    {% set total_grain  = ch_contribs | sum(attribute='total_grain') %}
+    <div style="border-top:1px solid var(--border);padding-top:0.55rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+        <span style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">
+          👥 {{ ch_contribs|length }} Defender(s)
+        </span>
+        <span style="font-size:0.75rem;color:#93c5fd;font-weight:600;">
+          🌾 {{ "{:,}".format(total_grain|int).replace(",",".") }}/h total
+        </span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.35rem;">
+        {% for c in ch_contribs %}
+        {% set bar_w = ((c.total_troops / total_troops) * 100)|int if total_troops > 0 else 0 %}
+        <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;">
+          <span style="font-weight:600;min-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ c.user_name }}">{{ c.user_name }}</span>
+          <div style="flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,.07);">
+            <div style="height:4px;border-radius:2px;background:#6366f1;width:{{ bar_w }}%;"></div>
+          </div>
+          <span style="color:#93c5fd;font-weight:600;white-space:nowrap;min-width:55px;text-align:right;">
+            {{ "{:,}".format(c.total_troops|int).replace(",",".") }}
+          </span>
+          <span style="color:#86efac;font-size:0.72rem;white-space:nowrap;min-width:60px;text-align:right;">
+            {{ "{:,}".format(c.total_grain|int).replace(",",".") }}/h
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+  {% endfor %}
+  </div>
+
+  <div style="text-align:center;color:var(--text-muted);font-size:0.75rem;padding:2rem 0 1rem;">
+    Powered by <a href="/" style="color:#6366f1;text-decoration:none;">TravOps</a> · read-only link
+  </div>
+
+</div>
+</body>
+</html>
