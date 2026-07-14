@@ -1276,11 +1276,28 @@ async def handle_archive_defend_channel(request: aiohttp_web.Request) -> aiohttp
                     view_channel=True, send_messages=False, add_reactions=False
                 )
 
-        await channel.edit(
-            category=archive_cat,
-            overwrites=overwrites,
-            reason="Defend-Channel archiviert",
-        )
+        try:
+            await channel.edit(
+                category=archive_cat,
+                overwrites=overwrites,
+                reason="Defend-Channel archiviert",
+            )
+        except discord.HTTPException as e:
+            if e.code == 50035 and "parent_id" in str(e):
+                # Category is full — force-create a new overflow category and retry once
+                suffix = sum(
+                    1 for c in guild.categories
+                    if c.name == "📦 Archiv" or c.name.startswith("📦 Archiv ")
+                ) + 1
+                new_name = f"📦 Archiv {suffix}"
+                ow2 = {
+                    guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                    guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True),
+                }
+                archive_cat = await guild.create_category(new_name, overwrites=ow2, reason="Archiv-Überlauf")
+                await channel.edit(category=archive_cat, overwrites=overwrites, reason="Defend-Channel archiviert (Überlauf)")
+            else:
+                raise
         await channel.send("📦 **Dieser Channel wurde archiviert** und ins Archiv verschoben.")
     except Exception as e:
         return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
