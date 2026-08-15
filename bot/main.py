@@ -1239,7 +1239,7 @@ async def _get_defend_channel(guild: discord.Guild, channel_id: str):
 
 
 async def handle_archive_defend_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
-    """Move defend channel into the 📦 Archiv category and make it read-only."""
+    """Defend-Channel beim Schließen löschen (früher: ins Archiv verschieben)."""
     try:
         data = await request.json()
     except Exception:
@@ -1255,22 +1255,19 @@ async def handle_archive_defend_channel(request: aiohttp_web.Request) -> aiohttp
     try:
         channel = await _get_defend_channel(guild, channel_id)
     except Exception:
-        return aiohttp_web.json_response({"ok": False, "error": "channel not found"}, status=404)
+        # Schon weg — für das Schließen ist das ein Erfolg, kein Fehler
+        return aiohttp_web.json_response({"ok": True, "deleted": False, "note": "already gone"})
 
-    """Beim Schließen wird der Channel gelöscht, nicht mehr verschoben.
-
-    Das Archiv wuchs mit jedem Call weiter — nach ein paar Wochen standen dort
-    hunderte Kanäle, die niemand mehr liest, und Discords Grenze von 50 Kanälen
-    je Kategorie zwang uns schon zu nummerierten Überlauf-Kategorien.
-
-    Die Daten des Calls (wer, wann, wie viele Truppen) liegen in der Datenbank
-    und bleiben im Dashboard sichtbar. Verloren gehen die *Nachrichten* im
-    Kanal — das ist der Preis und der ausdrückliche Wunsch.
-    """
+    # Schließen heißt löschen, nicht verschieben. Das Archiv wuchs mit jedem
+    # Call weiter — nach ein paar Wochen standen dort hunderte Kanäle, die
+    # niemand mehr liest, und Discords Grenze von 50 Kanälen je Kategorie zwang
+    # uns bereits zu nummerierten Überlauf-Kategorien. Die Daten des Calls
+    # liegen in der Datenbank und bleiben im Dashboard sichtbar; verloren gehen
+    # die Nachrichten im Kanal.
     try:
         name = channel.name
         await channel.delete(reason="Defend-Call geschlossen — Channel wird gelöscht")
-        log.info("defend channel deleted: #%s (%s) in guild %s", name, channel_id, guild_id)
+        print(f"[defend] Channel #{name} ({channel_id}) in Guild {guild_id} gelöscht")
     except discord.Forbidden:
         return aiohttp_web.json_response(
             {"ok": False, "error": "Dem Bot fehlt das Recht „Kanäle verwalten"}, status=403)
@@ -1373,14 +1370,15 @@ async def handle_archive_res_push_channel(request: aiohttp_web.Request) -> aioht
         if not channel:
             channel = await guild.fetch_channel(int(channel_id))
     except Exception:
-        return aiohttp_web.json_response({"ok": False, "error": "channel not found"}, status=404)
+        # Schon weg — Ziel erreicht
+        return aiohttp_web.json_response({"ok": True, "deleted": False, "note": "already gone"})
 
     # Wie beim Defend-Call: schließen heißt löschen. Die Beiträge des Pushes
     # stehen im Dashboard, der Kanal selbst wird nicht aufbewahrt.
     try:
         name = channel.name
         await channel.delete(reason="Res-Push geschlossen — Channel wird gelöscht")
-        log.info("res-push channel deleted: #%s (%s) in guild %s", name, channel_id, guild_id)
+        print(f"[res-push] Channel #{name} ({channel_id}) in Guild {guild_id} gelöscht")
     except discord.Forbidden:
         return aiohttp_web.json_response(
             {"ok": False, "error": "Dem Bot fehlt das Recht „Kanäle verwalten"}, status=403)
