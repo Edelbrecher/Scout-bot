@@ -14016,7 +14016,15 @@ async def defend_reopen(request: Request, guild_id: str, channel_id: str):
             r = await client.post("http://bot:7777/api/unarchive-defend-channel",
                                   json={"guild_id": guild_id, "channel_id": channel_id})
             data = r.json()
-            bot_msg = "archived" if data.get("ok") else f"bot_error:{data.get('error','?')[:80]}"
+            if data.get("ok"):
+                bot_msg = "archived"
+            elif "not found" in str(data.get("error", "")).lower():
+                # Seit dem Schließen wird der Kanal gelöscht — es gibt nichts
+                # zurückzuholen. Das ist kein Fehler, sondern der Normalfall,
+                # und wird auch so benannt.
+                bot_msg = "channel_gone"
+            else:
+                bot_msg = f"bot_error:{data.get('error','?')[:80]}"
     except Exception as e:
         bot_msg = f"bot_offline:{str(e)[:60]}"
     from urllib.parse import quote

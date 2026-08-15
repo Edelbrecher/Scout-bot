@@ -1192,8 +1192,15 @@ async def handle_announce_ep_cancelled(request: aiohttp_web.Request) -> aiohttp_
 
 
 async def _get_or_create_archive_category(guild: discord.Guild) -> discord.CategoryChannel:
-    """Return an archive category with room for at least one more channel.
-    Creates numbered overflow categories when the current one is full (Discord limit: 50)."""
+    """Archiv-Kategorie mit Platz für mindestens einen weiteren Kanal.
+
+    Wird beim Schließen nicht mehr gebraucht — Defend-Kanäle werden seitdem
+    gelöscht statt verschoben. Die Funktion bleibt, weil das Wiederherstellen
+    alter, noch im Archiv liegender Kanäle sie braucht; sie legt aber von sich
+    aus nichts Neues mehr an, solange niemand sie aufruft.
+
+    Legt nummerierte Überlauf-Kategorien an, wenn die aktuelle voll ist
+    (Discord-Grenze: 50)."""
     ARCHIVE_BASE = "📦 Archiv"
     DISCORD_CAT_LIMIT = 50
 
@@ -1250,59 +1257,30 @@ async def handle_archive_defend_channel(request: aiohttp_web.Request) -> aiohttp
     except Exception:
         return aiohttp_web.json_response({"ok": False, "error": "channel not found"}, status=404)
 
+    """Beim Schließen wird der Channel gelöscht, nicht mehr verschoben.
+
+    Das Archiv wuchs mit jedem Call weiter — nach ein paar Wochen standen dort
+    hunderte Kanäle, die niemand mehr liest, und Discords Grenze von 50 Kanälen
+    je Kategorie zwang uns schon zu nummerierten Überlauf-Kategorien.
+
+    Die Daten des Calls (wer, wann, wie viele Truppen) liegen in der Datenbank
+    und bleiben im Dashboard sichtbar. Verloren gehen die *Nachrichten* im
+    Kanal — das ist der Preis und der ausdrückliche Wunsch.
+    """
     try:
-        archive_cat = await _get_or_create_archive_category(guild)
-
-        # Load archive role config: only these roles may view archived channels
-        config = await database.get_guild_config(guild_id) or {}
-        archive_role_ids_str = config.get("archive_role_ids") or config.get("allowed_role_ids") or ""
-        allowed_role_ids = {r.strip() for r in archive_role_ids_str.split(",") if r.strip()}
-
-        # Build fresh overwrites — do NOT copy old defend-channel overwrites,
-        # those grant view to all defend participants which must not carry over.
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(
-                view_channel=False, send_messages=False
-            ),
-            guild.me: discord.PermissionOverwrite(
-                view_channel=True, send_messages=True, manage_channels=True
-            ),
-        }
-        # Grant view (read-only) only to explicitly configured archive roles
-        for role_id_str in allowed_role_ids:
-            role = guild.get_role(int(role_id_str))
-            if role:
-                overwrites[role] = discord.PermissionOverwrite(
-                    view_channel=True, send_messages=False, add_reactions=False
-                )
-
-        try:
-            await channel.edit(
-                category=archive_cat,
-                overwrites=overwrites,
-                reason="Defend-Channel archiviert",
-            )
-        except discord.HTTPException as e:
-            if e.code == 50035 and "parent_id" in str(e):
-                # Category is full — force-create a new overflow category and retry once
-                suffix = sum(
-                    1 for c in guild.categories
-                    if c.name == "📦 Archiv" or c.name.startswith("📦 Archiv ")
-                ) + 1
-                new_name = f"📦 Archiv {suffix}"
-                ow2 = {
-                    guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                    guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True),
-                }
-                archive_cat = await guild.create_category(new_name, overwrites=ow2, reason="Archiv-Überlauf")
-                await channel.edit(category=archive_cat, overwrites=overwrites, reason="Defend-Channel archiviert (Überlauf)")
-            else:
-                raise
-        await channel.send("📦 **Dieser Channel wurde archiviert** und ins Archiv verschoben.")
+        name = channel.name
+        await channel.delete(reason="Defend-Call geschlossen — Channel wird gelöscht")
+        log.info("defend channel deleted: #%s (%s) in guild %s", name, channel_id, guild_id)
+    except discord.Forbidden:
+        return aiohttp_web.json_response(
+            {"ok": False, "error": "Dem Bot fehlt das Recht „Kanäle verwalten"}, status=403)
+    except discord.NotFound:
+        # Schon weg — für den Aufrufer ist das kein Fehler, das Ziel ist erreicht
+        return aiohttp_web.json_response({"ok": True, "deleted": False, "note": "already gone"})
     except Exception as e:
         return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
 
-    return aiohttp_web.json_response({"ok": True})
+    return aiohttp_web.json_response({"ok": True, "deleted": True})
 
 
 async def handle_unarchive_defend_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
@@ -1397,26 +1375,21 @@ async def handle_archive_res_push_channel(request: aiohttp_web.Request) -> aioht
     except Exception:
         return aiohttp_web.json_response({"ok": False, "error": "channel not found"}, status=404)
 
+    # Wie beim Defend-Call: schließen heißt löschen. Die Beiträge des Pushes
+    # stehen im Dashboard, der Kanal selbst wird nicht aufbewahrt.
     try:
-        archive_cat = await _get_or_create_res_archive_category(guild)
-
-        # Build read-only overwrites — copy existing, strip send rights
-        overwrites = {}
-        for target, ow in channel.overwrites.items():
-            allow, deny = ow.pair()
-            new_ow = discord.PermissionOverwrite.from_pair(allow, deny)
-            new_ow.update(send_messages=False, add_reactions=False)
-            overwrites[target] = new_ow
-        # Fully hide from regular members, keep bot access
-        overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=False, send_messages=False)
-        overwrites[guild.me] = discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True)
-
-        await channel.edit(category=archive_cat, overwrites=overwrites, reason="Res-Push archived")
-        await channel.send("📦 **This push channel has been archived.** No further contributions possible.")
+        name = channel.name
+        await channel.delete(reason="Res-Push geschlossen — Channel wird gelöscht")
+        log.info("res-push channel deleted: #%s (%s) in guild %s", name, channel_id, guild_id)
+    except discord.Forbidden:
+        return aiohttp_web.json_response(
+            {"ok": False, "error": "Dem Bot fehlt das Recht „Kanäle verwalten"}, status=403)
+    except discord.NotFound:
+        return aiohttp_web.json_response({"ok": True, "deleted": False, "note": "already gone"})
     except Exception as e:
         return aiohttp_web.json_response({"ok": False, "error": str(e)}, status=500)
 
-    return aiohttp_web.json_response({"ok": True})
+    return aiohttp_web.json_response({"ok": True, "deleted": True})
 
 
 async def handle_unarchive_res_push_channel(request: aiohttp_web.Request) -> aiohttp_web.Response:
