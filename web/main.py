@@ -2289,11 +2289,9 @@ async def dashboard_remove_server(request: Request, guild_id: str = Form("")):
 
     # Archive instead of delete — bot stays in server to show reactivation prompt
     await database.archive_workspace(guild_id)
-    log.info(
-        "workspace archived: %s (%s) by %s%s",
-        guild.get("guild_name"), guild_id, uid,
-        "" if guild.get("owner_discord_id") == uid else " [not the owner]",
-    )
+    # Diese Datei loggt mit print — einen Logger gibt es hier nicht
+    print(f"[dashboard] archiviert: {guild.get('guild_name')} ({guild_id}) durch {uid}"
+          + ("" if guild.get("owner_discord_id") == uid else " [nicht der Besitzer]"), flush=True)
     return RedirectResponse("/dashboard?removed=1", status_code=303)
 
 
@@ -2316,7 +2314,7 @@ async def dashboard_restore_server(request: Request, guild_id: str = Form("")):
     if not _may_remove_workspace(session, guild):
         return RedirectResponse("/dashboard?error=not_owner", status_code=303)
     await database.restore_workspace(guild_id)
-    log.info("workspace restored: %s (%s) by %s", guild.get("guild_name"), guild_id, uid)
+    print(f"[dashboard] wiederhergestellt: {guild.get('guild_name')} ({guild_id}) durch {uid}", flush=True)
     return RedirectResponse("/dashboard?restored=1", status_code=303)
 
 
