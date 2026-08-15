@@ -414,6 +414,29 @@ async def _get_ally_nav_context(guild_id: str, session: dict) -> dict:
     }
 
 
+def _may_remove_workspace(session: dict, guild: dict) -> bool:
+    """Darf dieser Nutzer den Eintrag ins Archiv legen?
+
+    Dieselbe Regel wie überall sonst — und genau das war der Fehler: die
+    Entfernen-Route hat die Kennung roh mit ``owner_discord_id`` verglichen und
+    damit die Admin-Sitzung übergangen, die jede andere Stelle über
+    ``is_guild_owner`` durchlässt. Der Knopf stand also auf jeder Kachel, führte
+    aber bei fremden Servern nur zu „not_owner".
+
+    Zusätzlich: bei Einträgen ohne hinterlegten Besitzer — Altbestand und
+    Server, die der Bot nur einmal gesehen hat — kann sonst *niemand*
+    aufräumen. Sie bleiben ewig auf jedem Dashboard stehen, auf dem sie einmal
+    aufgetaucht sind.
+    """
+    if session.get("type") == "admin":
+        return True
+    uid = session.get("uid", "")
+    if guild.get("workspace_type") == "personal":
+        return guild.get("workspace_owner_id") == uid
+    besitzer = guild.get("owner_discord_id")
+    return besitzer == uid or not besitzer
+
+
 def is_guild_owner(session: dict, guild: dict) -> bool:
     """True if the logged-in user is the subscription owner of this guild."""
     if session.get("type") == "admin":
@@ -2131,6 +2154,10 @@ async def dashboard(request: Request, flash: str = ""):
             "invite_url": invite_url,
             "session": session,
             "user_id": owner_discord_id,
+            # Admin-Sitzungen dürfen jeden Eintrag archivieren — die Kacheln
+            # müssen das zeigen, sonst steht der Knopf da, wo er nicht wirkt,
+            # und fehlt da, wo er wirkt
+            "is_site_admin": session.get("type") == "admin",
             "slots_used": slots_used,
             "slots_max": slots_max,
             "slots_full": slots_full,
@@ -2257,13 +2284,16 @@ async def dashboard_remove_server(request: Request, guild_id: str = Form("")):
     if not guild:
         return RedirectResponse("/dashboard?error=not_found", status_code=303)
 
-    is_personal = guild.get("workspace_type") == "personal"
-    owner_field = "workspace_owner_id" if is_personal else "owner_discord_id"
-    if guild.get(owner_field) != uid:
+    if not _may_remove_workspace(session, guild):
         return RedirectResponse("/dashboard?error=not_owner", status_code=303)
 
     # Archive instead of delete — bot stays in server to show reactivation prompt
     await database.archive_workspace(guild_id)
+    log.info(
+        "workspace archived: %s (%s) by %s%s",
+        guild.get("guild_name"), guild_id, uid,
+        "" if guild.get("owner_discord_id") == uid else " [not the owner]",
+    )
     return RedirectResponse("/dashboard?removed=1", status_code=303)
 
 
@@ -2281,11 +2311,12 @@ async def dashboard_restore_server(request: Request, guild_id: str = Form("")):
             guild = dict(row) if row else None
     if not guild:
         return RedirectResponse("/dashboard?error=not_found", status_code=303)
-    is_personal = guild.get("workspace_type") == "personal"
-    owner_field = "workspace_owner_id" if is_personal else "owner_discord_id"
-    if guild.get(owner_field) != uid:
+    # Wiederherstellen nach derselben Regel wie das Archivieren — wer etwas
+    # wegräumen darf, muss es auch zurückholen können
+    if not _may_remove_workspace(session, guild):
         return RedirectResponse("/dashboard?error=not_owner", status_code=303)
     await database.restore_workspace(guild_id)
+    log.info("workspace restored: %s (%s) by %s", guild.get("guild_name"), guild_id, uid)
     return RedirectResponse("/dashboard?restored=1", status_code=303)
 
 

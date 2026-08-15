@@ -226,6 +226,16 @@
   <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.88rem;color:#fbbf24;">
     📦 Server archived — your data is preserved. You can reactivate it at any time.
   </div>
+  {% elif _qp.get("error") == "not_owner" %}
+  {# Die stille Abweisung war das Ärgerliche: der Knopf war da, der Klick tat
+     nichts, und niemand erfuhr, woran es lag. #}
+  <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.88rem;color:#f87171;">
+    🚫 Only the owner of that server can archive it. Ask them — or contact support if the owner is gone.
+  </div>
+  {% elif _qp.get("error") == "not_found" %}
+  <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.88rem;color:#f87171;">
+    🚫 That server no longer exists.
+  </div>
   {% elif _qp.get("restored") == "1" %}
   <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.88rem;color:#4ade80;">
     ✅ Server reactivated! Re-invite the bot to use it.
@@ -348,7 +358,11 @@
     {% for guild in guilds %}
     {% set sub = guild.subscription_status or 'free' %}
     {% set is_personal = guild.workspace_type == 'personal' %}
-    {% set is_owner = (guild.owner_discord_id == user_id) or (guild.workspace_owner_id == user_id) %}
+    {# „Darf entfernen" — dieselbe Regel wie im Server: Besitzer, Admin, oder
+       ein Eintrag ganz ohne hinterlegten Besitzer, den sonst niemand loswird. #}
+    {% set is_owner = (guild.owner_discord_id == user_id) or (guild.workspace_owner_id == user_id)
+                      or is_site_admin
+                      or (guild.workspace_type != 'personal' and not guild.owner_discord_id) %}
     {% set world_ended = (not is_personal) and guild.server_end_date and (guild.server_end_date < now_iso) %}
     <div class="guild-tile" data-id="{{ guild.guild_id }}" id="tile-{{ guild.guild_id }}">
       <!-- Sichtbarer Drag-Handle – hier anfassen zum Verschieben -->
@@ -357,6 +371,9 @@
           <div class="grip"><span></span><span></span><span></span></div>
           <span>Move</span>
         </div>
+        {# Nur zeigen, wo er auch wirkt. Vorher stand er auf jeder Kachel und
+           lief bei fremden Servern ins Leere. #}
+        {% if is_owner %}
         <button
           class="tile-remove-btn"
           data-guild-id="{{ guild.guild_id }}"
@@ -368,6 +385,7 @@
           onmouseover="this.style.opacity='1';this.style.color='#f87171'"
           onmouseout="this.style.opacity='0.6';this.style.color=''"
         >✕</button>
+        {% endif %}
       </div>
       <a href="/guild/{{ guild.guild_id }}">
         <div style="font-size:1.8rem;flex-shrink:0;">
