@@ -28,6 +28,9 @@ app = FastAPI(title="TravOps Solo", docs_url=None, redoc_url=None)
 # findet die Anwendung ihre Vorlagen nur, wenn sie zufällig aus dem richtigen
 # Ordner gestartet wurde.
 HIER = Path(__file__).resolve().parent
+# Der Ordner wird angelegt, falls er fehlt: ein leerer Ordner landet nicht in
+# Git und damit auch nicht im Abbild — die Anwendung startete dann gar nicht.
+(HIER / "static").mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=HIER / "static"), name="static")
 templates = Jinja2Templates(directory=str(HIER / "templates"))
 
