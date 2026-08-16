@@ -15,3 +15,18 @@ services:
       - "8000:8080"
     volumes:
       - ./data:/app/data
+
+  # Die neue Einzelwelt-Anwendung. Läuft zunächst neben der alten auf einem
+  # eigenen Port — so lässt sich alles in Ruhe ansehen, ohne dass jemandem
+  # unter den Händen der Dienst wechselt.
+  solo:
+    build: ./solo
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_PATH: /app/data/scouter.db
+      WORLD_ID: "1508779721133916200"
+    ports:
+      - "8100:8080"
+    volumes:
+      - ./data:/app/data

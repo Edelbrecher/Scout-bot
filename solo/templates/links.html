@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% set aktiv = 'links' %}
+{% block inhalt %}
+
+<div class="karte">
+  <h2>Neuen Zugang ausgeben</h2>
+  <form method="post" action="/links/neu" class="reihe">
+    <input type="text" name="name" placeholder="Für wen? z.B. Currax, oder „Flügel Nord“" maxlength="60" style="flex:1;min-width:200px;">
+    <select name="stufe">
+      <option value="mitglied">Mitglied — sehen und mitmachen</option>
+      <option value="leitung">Leitung — darf auch Zugänge vergeben</option>
+    </select>
+    <button class="knopf">Link erstellen</button>
+  </form>
+  <p class="leise" style="margin:.6rem 0 0;">
+    Jeder Link ist ein eigenes Geheimnis. Geht einer herum, sperrst du genau diesen —
+    alle anderen bleiben gültig. Wer den Link öffnet, ist dauerhaft auf diesem Gerät drin.
+  </p>
+</div>
+
+<div class="karte">
+  <h2>Vergebene Zugänge ({{ links | length }})</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Stufe</th><th>Link</th><th>Zuletzt</th><th>Aufrufe</th><th></th></tr></thead>
+    <tbody>
+    {% for l in links %}
+    <tr {% if l.revoked %}style="opacity:.45;"{% endif %}>
+      <td><b>{{ l.name }}</b></td>
+      <td>{{ 'Leitung' if l.stufe == 'leitung' else 'Mitglied' }}</td>
+      <td><code class="link">{{ basis }}/join/{{ l.token }}</code></td>
+      <td class="leise">{{ (l.last_seen or '—')[:16] | replace('T', ' ') }}</td>
+      <td class="leise">{{ l.uses }}</td>
+      <td style="white-space:nowrap;">
+        <form method="post" action="/links/{{ l.token }}/sperren" style="display:inline;">
+          {% if l.revoked %}<input type="hidden" name="zurueck" value="1">{% endif %}
+          <button class="knopf leise klein">{{ 'Wieder freigeben' if l.revoked else 'Sperren' }}</button>
+        </form>
+        <form method="post" action="/links/{{ l.token }}/loeschen" style="display:inline;"
+              onsubmit="return confirm('Diesen Zugang endgültig löschen?')">
+          <button class="knopf leise klein">✕</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if request.query_params.get('fehler') == 'selbst' %}
+  <p class="marke-warn" style="font-size:.85rem;">Den Zugang, mit dem du gerade hier bist, kannst du nicht löschen.</p>
+  {% endif %}
+</div>
+
+{% endblock %}

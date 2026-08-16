@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% set aktiv = 'start' %}
+{% block inhalt %}
+
+<div class="karte">
+  <div class="zahlen">
+    <div class="zahl"><b>{{ calls | length }}</b><span class="leise">offene Defend-Calls</span></div>
+    <div class="zahl"><b>{{ angriffe | length }}</b><span class="leise">angekündigte Angriffe</span></div>
+    <div class="zahl"><b>{{ pushes | length }}</b><span class="leise">offene Res-Pushes</span></div>
+    <div class="zahl"><b>{{ zahlen.mitglieder }}</b><span class="leise">Allianzmitglieder</span></div>
+    <div class="zahl"><b>{{ zahlen.doerfer }}</b><span class="leise">eigene Dörfer</span></div>
+  </div>
+</div>
+
+{# Offene Calls zuerst: sie sind der Grund, warum jemand die Seite aufmacht. #}
+<div class="karte">
+  <h2>Offene Defend-Calls</h2>
+  {% if calls %}
+  <table>
+    <thead><tr><th>Ziel</th><th>Angreifer</th><th>Ankunft</th><th>Hilfe</th><th></th></tr></thead>
+    <tbody>
+    {% for c in calls %}
+    <tr>
+      <td><b>{{ c.coords or '—' }}</b></td>
+      <td>{{ c.attacker or '—' }}</td>
+      <td>{{ c.arrival_time or '—' }}</td>
+      <td>{% if c.helfer %}<span class="marke-gut">{{ c.helfer }} Spieler · {{ '{:,}'.format(c.truppen).replace(',', '.') }} Truppen</span>
+          {% else %}<span class="marke-schlecht">noch niemand</span>{% endif %}</td>
+      <td class="leise">{{ c.requested_by_name or '' }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="leise">Gerade nichts offen.</p>{% endif %}
+</div>
+
+<div class="karte">
+  <h2>Angekündigte Angriffe</h2>
+  {% if angriffe %}
+  <table>
+    <thead><tr><th>Ankunft</th><th>Ziel</th><th>Angreifer</th><th>Truppen</th><th>Einschätzung</th></tr></thead>
+    <tbody>
+    {% for a in angriffe[:15] %}
+    <tr>
+      <td>{{ a.arrival_time or '—' }}</td>
+      <td>{{ a.own_village_name or '' }}
+        <span class="leise">{{ a.own_village_x }}|{{ a.own_village_y }}</span></td>
+      <td>{{ a.attacker_player or '—' }}
+        {% if a.attacker_alliance %}<span class="leise">[{{ a.attacker_alliance }}]</span>{% endif %}</td>
+      <td>{% if a.troops_hidden %}<span class="leise">verdeckt</span>
+          {% else %}{{ a.troop_count or '—' }}{% endif %}</td>
+      <td>{% if a.label %}{{ a.label }}
+          {% elif a.fake_score is not none %}<span class="leise">Fake-Wert {{ a.fake_score }}</span>
+          {% else %}—{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if angriffe | length > 15 %}<p class="leise">… und {{ angriffe | length - 15 }} weitere.</p>{% endif %}
+  {% else %}<p class="leise">Keine offenen Angriffsmeldungen.</p>{% endif %}
+</div>
+
+<div class="karte">
+  <h2>Res-Pushes</h2>
+  {% if pushes %}
+  <table>
+    <thead><tr><th>Spieler</th><th>Koordinaten</th><th>Höhe</th><th>Grund</th></tr></thead>
+    <tbody>
+    {% for p in pushes %}
+    <tr>
+      <td>{{ p.player_name or p.user_name or '—' }}</td>
+      <td>{{ p.coordinates or '—' }}</td>
+      <td>{{ p.push_height or '—' }}</td>
+      <td class="leise">{{ (p.reason or '')[:60] }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="leise">Keine offenen Pushes.</p>{% endif %}
+</div>
+
+{% endblock %}

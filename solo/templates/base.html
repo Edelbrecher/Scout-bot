@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block titel %}{{ welt }}{% endblock %} · TravOps</title>
+<style>
+:root {
+  --bg:#0f1117; --karte:#171a24; --rand:#262b38; --text:#e6e8ef;
+  --leise:#98a0b3; --akzent:#6366f1; --gut:#4ade80; --warn:#fbbf24; --schlecht:#f87171;
+}
+* { box-sizing:border-box; }
+body {
+  margin:0; background:var(--bg); color:var(--text);
+  font:15px/1.55 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+a { color:inherit; }
+.kopf {
+  display:flex; align-items:center; gap:1rem; flex-wrap:wrap;
+  padding:0.8rem 1.2rem; border-bottom:1px solid var(--rand); background:var(--karte);
+}
+.kopf .marke { font-weight:800; letter-spacing:-.01em; }
+.kopf nav { display:flex; gap:0.9rem; margin-left:auto; font-size:0.9rem; }
+.kopf nav a { color:var(--leise); text-decoration:none; }
+.kopf nav a:hover, .kopf nav a.aktiv { color:var(--text); }
+.stufe {
+  font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+  padding:2px 8px; border-radius:99px; background:rgba(99,102,241,.18); color:#a5b4fc;
+}
+main { max-width:1100px; margin:0 auto; padding:1.2rem; }
+.karte {
+  background:var(--karte); border:1px solid var(--rand); border-radius:12px;
+  padding:1rem 1.1rem; margin-bottom:0.9rem;
+}
+.karte h2 { margin:0 0 0.7rem; font-size:0.95rem; letter-spacing:.01em; }
+.leise { color:var(--leise); font-size:0.85rem; }
+.reihe { display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; }
+table { width:100%; border-collapse:collapse; font-size:0.86rem; }
+th { text-align:left; font-size:0.7rem; text-transform:uppercase; letter-spacing:.06em;
+     color:var(--leise); font-weight:700; padding:0.3rem 0.5rem; }
+td { padding:0.4rem 0.5rem; border-top:1px solid var(--rand); }
+.knopf {
+  display:inline-block; background:var(--akzent); color:#fff; border:none;
+  border-radius:8px; padding:0.45rem 0.9rem; font:inherit; font-size:0.85rem;
+  font-weight:600; cursor:pointer; text-decoration:none;
+}
+.knopf.leise { background:rgba(255,255,255,.07); color:var(--text); border:1px solid var(--rand); }
+.knopf.klein { padding:0.2rem 0.55rem; font-size:0.76rem; }
+.marke-gut { color:var(--gut); } .marke-warn { color:var(--warn); } .marke-schlecht { color:var(--schlecht); }
+.zahlen { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:0.7rem; }
+.zahl { background:rgba(255,255,255,.03); border:1px solid var(--rand); border-radius:10px; padding:0.7rem 0.9rem; }
+.zahl b { display:block; font-size:1.5rem; line-height:1.2; }
+input[type=text], select {
+  background:var(--bg); border:1px solid var(--rand); border-radius:8px; color:var(--text);
+  padding:0.4rem 0.6rem; font:inherit; font-size:0.88rem;
+}
+code.link { font-size:0.78rem; color:#a5b4fc; word-break:break-all; }
+</style>
+</head>
+<body>
+<header class="kopf">
+  <span class="marke">⚔️ {{ welt }}</span>
+  {% if zugang %}<span class="stufe">{{ 'Leitung' if zugang.stufe == 'leitung' else 'Mitglied' }}</span>{% endif %}
+  <nav>
+    <a href="/" class="{{ 'aktiv' if aktiv == 'start' }}">Übersicht</a>
+    {% if zugang and zugang.stufe == 'leitung' %}
+    <a href="/links" class="{{ 'aktiv' if aktiv == 'links' }}">Zugänge</a>
+    {% endif %}
+    <a href="/abmelden">Abmelden</a>
+  </nav>
+</header>
+<main>{% block inhalt %}{% endblock %}</main>
+</body>
+</html>
